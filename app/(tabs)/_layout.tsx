@@ -1,0 +1,127 @@
+import { Tabs } from 'expo-router';
+import { Users, MessageCircle, Settings, Activity, MessagesSquare } from 'lucide-react-native';
+import { ActivityProvider } from '@/contexts/ActivityContext';
+import { MeetingReminderProvider } from '@/contexts/MeetingReminderContext';
+import { useChats } from '@/hooks/useChats';
+import { View, Text, StyleSheet } from 'react-native';
+
+function ChatTabIcon({ size, color }: { size: number; color: string }) {
+  const { chats } = useChats();
+  const totalUnread = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
+
+  return (
+    <View style={styles.tabIconContainer}>
+      <MessageCircle size={size} color={color} />
+      {totalUnread > 0 && (
+        <View style={styles.unreadBadge}>
+          <Text style={styles.unreadText}>
+            {totalUnread > 99 ? '99+' : totalUnread.toString()}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  tabIconContainer: {
+    position: 'relative',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#FF8C42',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  unreadText: {
+    color: 'white',
+    fontSize: 10,
+    fontFamily: 'Inter_700Bold',
+  },
+});
+
+export default function TabLayout() {
+  return (
+    <ActivityProvider>
+      <MeetingReminderProvider>
+        <Tabs
+          screenOptions={{
+            headerShown: false,
+            tabBarActiveTintColor: '#FF8C42',
+            tabBarInactiveTintColor: '#999',
+            tabBarStyle: {
+              backgroundColor: 'white',
+              borderTopWidth: 1,
+              borderTopColor: '#eee',
+              paddingTop: 8,
+              paddingBottom: 20,
+              height: 85,
+            },
+            tabBarLabelStyle: {
+              fontSize: 12,
+              fontFamily: 'Inter_500Medium',
+              marginTop: 2,
+              marginBottom: 4,
+            },
+            tabBarIconStyle: {
+              marginTop: 8,
+              marginBottom: 0,
+            },
+          }}>
+          <Tabs.Screen
+            name="index"
+            options={{
+              title: 'Activities',
+              tabBarIcon: ({ size, color }) => (
+                <Activity size={size} color={color} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="forum"
+            options={{
+              title: 'Forum',
+              tabBarIcon: ({ size, color }) => (
+                <MessagesSquare size={size} color={color} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="people"
+            options={{
+              title: 'People',
+              tabBarIcon: ({ size, color }) => (
+                <Users size={size} color={color} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="chats"
+            options={{
+              title: 'Chats',
+              tabBarIcon: ({ size, color }) => (
+                <ChatTabIcon size={size} color={color} />
+              ),
+            }}
+          />
+          <Tabs.Screen
+            name="profile"
+            options={{
+              title: 'Profile',
+              tabBarIcon: ({ size, color }) => (
+                <Settings size={size} color={color} />
+              ),
+            }}
+          />
+        </Tabs>
+      </MeetingReminderProvider>
+    </ActivityProvider>
+  );
+}

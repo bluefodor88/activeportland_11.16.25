@@ -1,0 +1,287 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  FlatList,
+  StyleSheet,
+  SafeAreaView,
+  Image,
+} from 'react-native';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { MessageCircle, MapPin } from 'lucide-react-native';
+import { useActivityContext } from '@/contexts/ActivityContext';
+import { usePeople } from '@/hooks/usePeople';
+import { useLocationTracking } from '@/hooks/useLocationTracking';
+import { getOrCreateChat } from '@/hooks/useChats';
+import { useAuth } from '@/hooks/useAuth';
+import { ActivityHeader } from '@/components/ActivityHeader';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+
+
+export default function PeopleScreen() {
+  const { activityId, activity, skillLevel, emoji } = useActivityContext();
+  const { user } = useAuth();
+  const { location, locationPermission, updateLocation, requestLocationPermission } = useLocationTracking();
+
+  const { people, loading, refetch } = usePeople();
+
+  const openChat = async (userId: string, userName: string) => {
+    if (!user) return;
+    
+    try {
+      const chatId = await getOrCreateChat(user.id, userId);
+      if (chatId) {
+        router.push({
+          pathname: '/chat/[id]',
+          params: { id: userId, name: userName },
+        });
+      }
+    } catch (error) {
+      console.error('Error opening chat:', error);
+    }
+  };
+
+  const getSkillColor = (skillLevel: string) => {
+    switch (skillLevel) {
+      case 'Beginner':
+        return '#4CAF50';
+      case 'Intermediate':
+        return '#FFCF56';
+      case 'Advanced':
+        return '#FF6B35';
+      default:
+        return '#999';
+    }
+  };
+
+  const renderUser = ({ item }: { item: any }) => (
+    <View style={styles.userCard}>
+      <Image source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2' }} style={styles.avatar} />
+      <View style={styles.userInfo}>
+        <Text style={styles.userName}>{item.name}</Text>
+        <View style={styles.skillContainer}>
+          <View style={[styles.skillBadge, { backgroundColor: getSkillColor(item.skill_level) }]}>
+            <Text style={styles.skillText}>{item.skill_level}</Text>
+          </View>
+        </View>
+        <View style={styles.distanceContainer}>
+          <MapPin size={14} color="#666" />
+          <Text style={styles.distanceText}>{item.distance}</Text>
+        </View>
+      </View>
+      <TouchableOpacity
+        style={styles.chatButton}
+        onPress={() => {
+          openChat(item.id, item.name);
+        }}
+      >
+        <MessageCircle size={20} color="white" />
+      </TouchableOpacity>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="dark" />
+        <View style={styles.loadingContainer}>
+          <LoadingSpinner size={32} />
+          <Text style={[styles.loadingText, { marginTop: 16 }]}>Loading people...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar style="dark" />
+      <ActivityHeader />
+      <View style={styles.header}>
+        <View style={styles.headerGradient} />
+        <Text style={styles.title}>
+          People Nearby
+        </Text>
+        {!locationPermission && (
+          <TouchableOpacity 
+            style={styles.locationButton} 
+            onPress={async () => {
+              const granted = await requestLocationPermission();
+              if (granted) {
+                refetch(); // Refresh people list with real distances
+              }
+            }}
+          >
+            <Text style={styles.locationButtonText}>📍 Show Real Distances</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <FlatList
+        data={people}
+        renderItem={renderUser}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No people found</Text>
+            <Text style={styles.emptySubtitle}>
+              Be the first to join this activity community!
+            </Text>
+          </View>
+        )}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FAF9F6',
+  },
+  header: {
+    padding: 20,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  headerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 4,
+    backgroundColor: '#FF8C42',
+  },
+  title: {
+    fontSize: 24,
+    fontFamily: 'Inter_700Bold',
+    color: '#333',
+    textShadowColor: 'rgba(255, 140, 66, 0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  subtitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    color: '#666',
+    marginTop: 4,
+  },
+  listContainer: {
+    padding: 16,
+  },
+  userCard: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFCF56',
+    marginBottom: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 2,
+    transform: [{ scale: 1 }],
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 16,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  skillContainer: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  skillBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  skillText: {
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: 'white',
+  },
+  distanceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  distanceText: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+    color: '#666',
+    marginLeft: 4,
+  },
+  chatButton: {
+    backgroundColor: '#FF8C42',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Inter_400Regular',
+    color: '#666',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter_700Bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    color: '#666',
+    textAlign: 'center',
+  },
+  locationButton: {
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#2196F3',
+  },
+  locationButtonText: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    color: '#1565C0',
+    textAlign: 'center',
+  },
+});
