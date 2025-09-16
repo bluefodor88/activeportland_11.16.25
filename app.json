@@ -1,14 +1,19 @@
 {
   "expo": {
+    "name": "ActivePortland",
+    "slug": "activeportland",
+    "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "platforms": ["ios", "android", "web"],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
     "jsEngine": "jsc",
     "assetBundlePatterns": [
       "**/*"
     ],
-    "slug": "activeportland",
-    "name": "ActivePortland",
     "extra": {
       "eas": {
         "projectId": "08f6f8e6-0c4c-497a-988f-6b6b895984fe"
@@ -17,6 +22,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.campbell3c2.activeportland",
+      "buildNumber": "20",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "ActivePortland uses the camera to let you take a profile photo, helping other activity partners recognize you at meetups and creating a safer, more connected community experience.",
@@ -38,7 +44,9 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-font",
+      "expo-web-browser"
     ],
     "scheme": "activeportland",
     "experiments": {

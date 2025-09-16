@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { MessageCircle, MapPin } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useActivityContext } from '@/contexts/ActivityContext';
 import { usePeople } from '@/hooks/usePeople';
 import { useLocationTracking } from '@/hooks/useLocationTracking';
@@ -67,7 +67,7 @@ export default function PeopleScreen() {
           </View>
         </View>
         <View style={styles.distanceContainer}>
-          <MapPin size={14} color="#666" />
+                <Ionicons name="location" size={14} color="#666" />
           <Text style={styles.distanceText}>{item.distance}</Text>
         </View>
       </View>
@@ -77,7 +77,7 @@ export default function PeopleScreen() {
           openChat(item.id, item.name);
         }}
       >
-        <MessageCircle size={20} color="white" />
+                <Ionicons name="chatbubble" size={20} color="white" />
       </TouchableOpacity>
     </View>
   );

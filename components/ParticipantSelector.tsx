@@ -8,7 +8,7 @@ import {
   StyleSheet,
   Image,
 } from 'react-native';
-import { X, Plus, Search } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useChatContacts } from '@/hooks/useChatContacts';
 
 interface Participant {
@@ -91,7 +91,7 @@ export function ParticipantSelector({
         style={styles.removeButton}
         onPress={() => removeParticipant(item.id)}
       >
-        <X size={16} color="#F44336" />
+                <Ionicons name="close" size={16} color="#F44336" />
       </TouchableOpacity>
     </View>
   )
@@ -111,7 +111,7 @@ export function ParticipantSelector({
         <Text style={styles.suggestionName}>{item.name}</Text>
         <Text style={styles.suggestionEmail}>{item.email}</Text>
       </View>
-      <Plus size={20} color="#4CAF50" />
+                <Ionicons name="add" size={20} color="#4CAF50" />
     </TouchableOpacity>
   )
 
@@ -137,7 +137,7 @@ export function ParticipantSelector({
       {/* Search Input */}
       {selectedParticipants.length < maxParticipants && (
         <View style={styles.searchContainer}>
-          <Search size={20} color="#999" style={styles.searchIcon} />
+                <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             value={searchTerm}

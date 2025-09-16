@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ArrowLeft, Send, Calendar } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useAuth } from '@/hooks/useAuth';
 import { getOrCreateChat } from '@/hooks/useChats';
@@ -49,8 +49,9 @@ export default function ChatScreen() {
   const [selectedParticipants, setSelectedParticipants] = useState<Participant[]>([]);
   
   const { user } = useAuth();
-  const { messages, loading: messagesLoading, sendMessage } = useChatMessages(chatId);
+  const { messages, loading: messagesLoading, error: messagesError, sendMessage } = useChatMessages(chatId);
   const { inviteParticipants } = useEventParticipants();
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     initializeChat();
@@ -75,6 +76,17 @@ export default function ChatScreen() {
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-scroll to bottom when messages change (debounced to prevent excessive calls)
+  useEffect(() => {
+    if (combinedData && combinedData.length > 0 && flatListRef.current) {
+      const timeoutId = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [combinedData?.length || 0]);
+
   // Generate available dates (next 3 weeks)
   const generateAvailableDates = () => {
     const dates = [];
@@ -94,6 +106,44 @@ export default function ChatScreen() {
     return dates;
   };
 
+  // Combine all data for FlatList (memoized to prevent memory leaks)
+  const combinedData = useMemo(() => {
+    const data = [];
+    
+    // Add accepted meetings first
+    acceptedMeetings.forEach((meeting) => {
+      data.push({
+        id: `meeting-${meeting.id}`,
+        type: 'acceptedMeeting',
+        data: meeting,
+        timestamp: new Date(meeting.event_date + 'T' + meeting.event_time).getTime()
+      });
+    });
+    
+    // Add pending invites
+    pendingInvites.forEach((invite) => {
+      data.push({
+        id: `invite-${invite.id}`,
+        type: 'invite',
+        data: invite,
+        timestamp: new Date(invite.created_at).getTime()
+      });
+    });
+    
+    // Add messages
+    messages.forEach((message) => {
+      data.push({
+        id: `message-${message.id}`,
+        type: 'message',
+        data: message,
+        timestamp: new Date(message.created_at).getTime()
+      });
+    });
+    
+    // Sort by timestamp
+    return data.sort((a, b) => a.timestamp - b.timestamp);
+  }, [acceptedMeetings, pendingInvites, messages]);
+
   // Generate available times (5am to 10pm)
   const generateAvailableTimes = () => {
     const times = [];
@@ -112,6 +162,20 @@ export default function ChatScreen() {
       }
     }
     return times;
+  };
+
+  // Render item for FlatList
+  const renderItem = ({ item }: { item: any }) => {
+    switch (item.type) {
+      case 'acceptedMeeting':
+        return renderAcceptedMeeting({ item: item.data });
+      case 'invite':
+        return renderInvite({ item: item.data });
+      case 'message':
+        return renderMessage({ item: item.data });
+      default:
+        return null;
+    }
   };
 
   const fetchPendingInvites = async () => {
@@ -193,28 +257,38 @@ export default function ChatScreen() {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !chatId) return;
+    if (!newMessage?.trim() || !chatId || !user) {
+      Alert.alert('Error', 'Cannot send message - missing required information');
+      return;
+    }
 
     if (newMessage.trim().length > 1000) {
       Alert.alert('Message Too Long', 'Please keep messages under 1000 characters');
       return;
     }
 
-    const success = await sendMessage(newMessage);
-    if (success) {
-      setNewMessage('');
-    } else {
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+    try {
+      const success = await sendMessage(newMessage);
+      if (success) {
+        setNewMessage('');
+        // Scroll to bottom after sending message
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      } else {
+        Alert.alert('Error', 'Failed to send message. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error in handleSendMessage:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     }
   };
 
   const handleScheduleEvent = async () => {
-    if (!eventLocation.trim() || !selectedDate || !selectedTime) {
-      Alert.alert('Missing Information', 'Please fill in location, date, and time');
+    if (!eventLocation?.trim() || !selectedDate || !selectedTime || !user || !chatId || !id) {
+      Alert.alert('Missing Information', 'Please fill in all required fields');
       return;
     }
-
-    if (!user) return;
 
     try {
       // Create the meetup invite
@@ -276,6 +350,11 @@ export default function ChatScreen() {
   };
 
   const handleInviteResponse = async (inviteId: string, status: 'accepted' | 'declined') => {
+    if (!inviteId?.trim()) {
+      Alert.alert('Error', 'Invalid invite ID');
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('meetup_invites')
@@ -441,7 +520,7 @@ export default function ChatScreen() {
         <StatusBar style="dark" />
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#333" />
+                <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{name || 'Chat'}</Text>
           <View style={styles.placeholder} />
@@ -460,7 +539,7 @@ export default function ChatScreen() {
         <StatusBar style="dark" />
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <ArrowLeft size={24} color="#333" />
+                <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{name || 'Chat'}</Text>
           <View style={styles.placeholder} />
@@ -481,44 +560,48 @@ export default function ChatScreen() {
       
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#333" />
+                <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{name || 'Chat'}</Text>
         <TouchableOpacity 
           style={styles.scheduleButton} 
           onPress={() => setShowScheduleModal(true)}
         >
-          <Calendar size={24} color="#FF8C42" />
+                <Ionicons name="calendar" size={24} color="#FF8C42" />
         </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView 
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {messagesLoading ? (
           <View style={styles.centerContainer}>
             <LoadingSpinner size={32} />
             <Text style={[styles.loadingText, { marginTop: 16 }]}>Loading messages...</Text>
           </View>
+        ) : messagesError ? (
+          <View style={styles.centerContainer}>
+            <Text style={styles.errorText}>{messagesError}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => initializeChat()}>
+              <Text style={styles.retryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : messages.length > 0 || pendingInvites.length > 0 ? (
-          <ScrollView style={styles.messagesList} contentContainerStyle={styles.messagesContainer}>
-            {acceptedMeetings.map((meeting) => (
-              <View key={`meeting-${meeting.id}`}>
-                {renderAcceptedMeeting({ item: meeting })}
-              </View>
-            ))}
-            {pendingInvites.map((invite) => (
-              <View key={`invite-${invite.id}`}>
-                {renderInvite({ item: invite })}
-              </View>
-            ))}
-            {messages.map((message) => (
-              <View key={`message-${message.id}`}>
-                {renderMessage({ item: message })}
-              </View>
-            ))}
-          </ScrollView>
+          <FlatList
+            ref={flatListRef}
+            style={styles.messagesList}
+            contentContainerStyle={styles.messagesContainer}
+            data={combinedData || []}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id}
+            onContentSizeChange={() => {
+              // Only scroll if we're near the bottom
+              setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
+            }}
+            showsVerticalScrollIndicator={false}
+          />
         ) : (
           <View style={styles.centerContainer}>
             <Text style={styles.emptyTitle}>Start the conversation</Text>
@@ -543,7 +626,7 @@ export default function ChatScreen() {
             onPress={handleSendMessage}
             disabled={!newMessage.trim()}
           >
-            <Send size={20} color="white" />
+                <Ionicons name="send" size={20} color="white" />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

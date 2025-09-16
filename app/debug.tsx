@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ArrowLeft, Database } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -106,13 +106,14 @@ export default function DatabaseDebugScreen() {
       
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#333" />
+                <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Database Debug</Text>
-        <Database size={24} color="#333" />
+        <Ionicons name="server" size={24} color="#333" />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContainer}>
+        
         
         {/* Current User Info */}
         <View style={styles.section}>

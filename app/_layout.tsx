@@ -12,17 +12,11 @@ import {
 } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFrameworkReady } from '@/hooks/useFrameworkReady';
-import * as Sentry from '@sentry/react-native';
-
-Sentry.init({
-  dsn: 'https://b4cc689e389fc507ac8eb05439df293d@o4509885229432832.ingest.us.sentry.io/4509885289070592',
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-});
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
-export default Sentry.wrap(function RootLayout() {
+export default function RootLayout() {
   useFrameworkReady();
 
   const [fontsLoaded] = useFonts({
@@ -49,9 +43,9 @@ export default Sentry.wrap(function RootLayout() {
   }
 
   return (
-    <>
+    <ErrorBoundary>
       <Stack screenOptions={{ headerShown: false }} />
       <StatusBar style="auto" />
-    </>
+    </ErrorBoundary>
   );
-})
+}

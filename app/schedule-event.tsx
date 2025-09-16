@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ArrowLeft, Calendar, MapPin, Clock, Users } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { useEventParticipants } from '@/hooks/useEventParticipants';
 import { supabase } from '@/lib/supabase';
@@ -136,7 +136,7 @@ export default function ScheduleEventScreen() {
       
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#333" />
+                <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Schedule Event</Text>
         <View style={styles.placeholder} />
@@ -161,7 +161,7 @@ export default function ScheduleEventScreen() {
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Location</Text>
           <View style={styles.inputWithIcon}>
-            <MapPin size={20} color="#666" style={styles.inputIcon} />
+                <Ionicons name="location" size={20} color="#666" style={styles.inputIcon} />
             <TextInput
               style={styles.textInputWithIcon}
               value={location}
@@ -249,7 +249,7 @@ export default function ScheduleEventScreen() {
           onPress={handleCreateEvent}
           disabled={loading}
         >
-          <Calendar size={20} color="white" style={styles.buttonIcon} />
+                <Ionicons name="calendar" size={20} color="white" style={styles.buttonIcon} />
           <Text style={styles.createButtonText}>
             {loading ? 'Creating Event...' : 'Create Event'}
           </Text>

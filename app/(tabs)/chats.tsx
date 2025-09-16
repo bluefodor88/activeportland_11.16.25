@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { MessageCircle } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useChats } from '@/hooks/useChats';
 import { ActivityHeader } from '@/components/ActivityHeader';
 import { useMeetingReminder } from '@/contexts/MeetingReminderContext';
@@ -106,7 +106,7 @@ export default function ChatsScreen() {
         />
       ) : (
         <View style={styles.emptyState}>
-          <MessageCircle size={64} color="#ccc" />
+                <Ionicons name="chatbubble" size={64} color="#ccc" />
           <Text style={styles.emptyTitle}>No conversations yet</Text>
           <Text style={styles.emptySubtitle}>
             Start chatting with people from the forum or people section

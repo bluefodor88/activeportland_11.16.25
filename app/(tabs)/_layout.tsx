@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Users, MessageCircle, Settings, Activity, MessagesSquare } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ActivityProvider } from '@/contexts/ActivityContext';
 import { MeetingReminderProvider } from '@/contexts/MeetingReminderContext';
 import { useChats } from '@/hooks/useChats';
@@ -11,7 +11,7 @@ function ChatTabIcon({ size, color }: { size: number; color: string }) {
 
   return (
     <View style={styles.tabIconContainer}>
-      <MessageCircle size={size} color={color} />
+      <Ionicons name="chatbubble-outline" size={size} color={color} />
       {totalUnread > 0 && (
         <View style={styles.unreadBadge}>
           <Text style={styles.unreadText}>
@@ -80,7 +80,7 @@ export default function TabLayout() {
             options={{
               title: 'Activities',
               tabBarIcon: ({ size, color }) => (
-                <Activity size={size} color={color} />
+                <Ionicons name="fitness-outline" size={size} color={color} />
               ),
             }}
           />
@@ -89,7 +89,7 @@ export default function TabLayout() {
             options={{
               title: 'Forum',
               tabBarIcon: ({ size, color }) => (
-                <MessagesSquare size={size} color={color} />
+                <Ionicons name="chatbubbles-outline" size={size} color={color} />
               ),
             }}
           />
@@ -98,7 +98,7 @@ export default function TabLayout() {
             options={{
               title: 'People',
               tabBarIcon: ({ size, color }) => (
-                <Users size={size} color={color} />
+                <Ionicons name="people-outline" size={size} color={color} />
               ),
             }}
           />
@@ -116,7 +116,7 @@ export default function TabLayout() {
             options={{
               title: 'Profile',
               tabBarIcon: ({ size, color }) => (
-                <Settings size={size} color={color} />
+                <Ionicons name="person-outline" size={size} color={color} />
               ),
             }}
           />

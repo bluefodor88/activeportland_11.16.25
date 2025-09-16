@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Camera, LogOut, Settings } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/hooks/useAuth';
@@ -316,7 +316,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.imageContainer} onPress={handleImageUpload}>
             <Image source={{ uri: profile?.avatar_url || profileImage }} style={styles.profileImage} />
             <View style={styles.cameraIconContainer}>
-              <Camera size={16} color="white" />
+                <Ionicons name="camera" size={16} color="white" />
             </View>
           </TouchableOpacity>
           <Text style={styles.name}>{profile?.name || 'Loading...'}</Text>
@@ -362,12 +362,12 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Settings</Text>
           
           <TouchableOpacity style={styles.settingItem} onPress={handleAppSettings}>
-            <Settings size={20} color="#333" />
+                <Ionicons name="settings" size={20} color="#333" />
             <Text style={styles.settingText}>App Settings</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.settingItem} onPress={handleLogout}>
-            <LogOut size={20} color="#F44336" />
+            <Ionicons name="log-out" size={20} color="#F44336" />
             <Text style={[styles.settingText, { color: '#F44336' }]}>Logout</Text>
           </TouchableOpacity>
         </View>

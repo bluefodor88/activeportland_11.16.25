@@ -29,7 +29,11 @@ export function useForumMessages(activityId?: string) {
         .subscribe()
 
       return () => {
-        subscription.unsubscribe()
+        try {
+          subscription.unsubscribe()
+        } catch (error) {
+          console.error('Error unsubscribing from forum messages:', error)
+        }
       }
     }
   }, [activityId])

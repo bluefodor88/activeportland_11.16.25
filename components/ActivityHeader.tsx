@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
-import { RotateCcw } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useActivityContext } from '@/contexts/ActivityContext';
 
 export function ActivityHeader() {
@@ -30,7 +30,7 @@ export function ActivityHeader() {
           <Text style={styles.subtitle}>(activity selected)</Text>
         </View>
         <TouchableOpacity style={styles.changeButton} onPress={handleChangeActivity}>
-          <RotateCcw size={16} color="white" />
+                <Ionicons name="refresh" size={16} color="white" />
           <Text style={styles.changeButtonText}>Change Activity</Text>
         </TouchableOpacity>
       </View>

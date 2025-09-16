@@ -14,10 +14,12 @@ export function useChatMessages(chatId: string | null) {
   const { user } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (chatId) {
       setLoading(true)
+      setError(null)
       fetchMessages()
       
       // Set up real-time subscription for new messages
@@ -34,14 +36,26 @@ export function useChatMessages(chatId: string | null) {
             fetchMessages() // Refresh messages when new ones are added
           }
         )
-        .subscribe()
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Successfully subscribed to chat messages')
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('Error subscribing to chat messages')
+            setError('Failed to connect to real-time updates')
+          }
+        })
 
       return () => {
-        subscription.unsubscribe()
+        try {
+          subscription.unsubscribe()
+        } catch (error) {
+          console.error('Error unsubscribing from chat messages:', error)
+        }
       }
     } else {
       setMessages([])
       setLoading(false)
+      setError(null)
     }
   }, [chatId])
 
@@ -49,6 +63,7 @@ export function useChatMessages(chatId: string | null) {
     if (!chatId) return
 
     setLoading(true)
+    setError(null)
     try {
       const { data, error } = await supabase
         .from('chat_messages')
@@ -58,12 +73,15 @@ export function useChatMessages(chatId: string | null) {
 
       if (error) {
         console.error('Error fetching chat messages:', error)
+        setError('Failed to load messages')
         setMessages([])
       } else {
         setMessages(data || [])
+        setError(null)
       }
     } catch (error) {
       console.error('Error fetching chat messages:', error)
+      setError('Network error - please check your connection')
       setMessages([])
     } finally {
       setLoading(false)
@@ -73,12 +91,14 @@ export function useChatMessages(chatId: string | null) {
   const sendMessage = async (message: string): Promise<boolean> => {
     if (!chatId || !user || !message.trim()) {
       console.error('Cannot send message: missing required data')
+      setError('Cannot send message - missing required data')
       return false
     }
 
     // Validate message length
     if (message.trim().length > 1000) {
       console.error('Message too long')
+      setError('Message too long - please keep under 1000 characters')
       return false
     }
 
@@ -93,23 +113,31 @@ export function useChatMessages(chatId: string | null) {
 
       if (error) {
         console.error('Error sending message:', error)
+        setError('Failed to send message')
         return false
       }
 
       // Update chat's last_message_at
-      await supabase
-        .from('chats')
-        .update({ last_message_at: new Date().toISOString() })
-        .eq('id', chatId)
+      try {
+        await supabase
+          .from('chats')
+          .update({ last_message_at: new Date().toISOString() })
+          .eq('id', chatId)
+      } catch (updateError) {
+        console.warn('Failed to update chat timestamp:', updateError)
+        // Don't fail the entire operation for this
+      }
 
       // Immediately fetch messages to update the UI
       fetchMessages()
+      setError(null)
       return true
     } catch (error) {
       console.error('Error sending message:', error)
+      setError('Network error - please check your connection')
       return false
     }
   }
 
-  return { messages, loading, sendMessage, refetch: fetchMessages }
+  return { messages, loading, error, sendMessage, refetch: fetchMessages }
 }

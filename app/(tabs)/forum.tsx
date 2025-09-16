@@ -14,7 +14,7 @@ import {
   Pressable,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Send, Reply, X } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useActivityContext } from '@/contexts/ActivityContext';
 import { useForumMessages } from '@/hooks/useForumMessages';
@@ -120,7 +120,7 @@ export default function ForumScreen() {
     >
       {replyToMessage && (
         <View style={styles.replyContainer}>
-          <Reply size={14} color="#666" />
+                <Ionicons name="arrow-undo" size={14} color="#666" />
           <Text style={styles.replyText}>
             Replying to {replyToMessage.profiles?.name || 'Unknown'}: {replyToMessage.message.substring(0, 50)}...
           </Text>
@@ -197,12 +197,12 @@ export default function ForumScreen() {
             {replyingTo && (
               <View style={styles.replyPreview}>
                 <View style={styles.replyPreviewHeader}>
-                  <Reply size={16} color="#FF8C42" />
+                  <Ionicons name="arrow-undo" size={16} color="#FF8C42" />
                   <Text style={styles.replyPreviewText}>
                     Replying to {replyingTo.profiles?.name || 'Unknown'}
                   </Text>
                   <TouchableOpacity onPress={cancelReply} style={styles.cancelReplyButton}>
-                    <X size={16} color="#666" />
+                    <Ionicons name="close" size={16} color="#666" />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.replyPreviewMessage} numberOfLines={2}>
@@ -221,7 +221,7 @@ export default function ForumScreen() {
               multiline
             />
             <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-              <Send size={20} color="white" />
+                <Ionicons name="send" size={20} color="white" />
             </TouchableOpacity>
           </View>
           </>
