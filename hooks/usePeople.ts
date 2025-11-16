@@ -9,6 +9,7 @@ interface PersonWithSkill extends Profile {
   skill_level: string
   distance: string
   distanceValue: number
+  ready_today: boolean
 }
 
 export function usePeople() {
@@ -46,6 +47,7 @@ export function usePeople() {
           user_id,
           activity_id,
           skill_level,
+          ready_today,
           profiles!user_activity_skills_user_id_fkey (
             id,
             name,
@@ -81,12 +83,20 @@ export function usePeople() {
           created_at: item.profiles.created_at,
           updated_at: item.profiles.updated_at,
           skill_level: item.skill_level,
+          ready_today: item.ready_today ?? false,
           distance: calculateDistanceForUser(item.profiles),
           distanceValue: calculateDistanceValueForUser(item.profiles)
         }))
         
-        // Sort by distance (closest first)
-        peopleWithSkills.sort((a, b) => a.distanceValue - b.distanceValue)
+        // Sort by ready_today first (ready people at top), then by distance
+        peopleWithSkills.sort((a, b) => {
+          // First sort by ready_today (true comes first)
+          if (a.ready_today !== b.ready_today) {
+            return a.ready_today ? -1 : 1
+          }
+          // Then sort by distance (closest first)
+          return a.distanceValue - b.distanceValue
+        })
         
         setPeople(peopleWithSkills)
       } else {
@@ -138,5 +148,33 @@ export function usePeople() {
     )
   }
 
-  return { people, loading, refetch: fetchPeople }
+  const updateReadyToday = async (activityId: string, ready: boolean) => {
+    if (!user) return false
+
+    try {
+      const { error } = await supabase
+        .from('user_activity_skills')
+        .upsert({
+          user_id: user.id,
+          activity_id: activityId,
+          ready_today: ready,
+        }, {
+          onConflict: 'user_id,activity_id'
+        })
+
+      if (error) {
+        console.error('Error updating ready_today:', error)
+        return false
+      } else {
+        // Refresh the people list
+        fetchPeople()
+        return true
+      }
+    } catch (error) {
+      console.error('Error updating ready_today:', error)
+      return false
+    }
+  }
+
+  return { people, loading, refetch: fetchPeople, updateReadyToday }
 }

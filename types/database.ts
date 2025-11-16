@@ -20,6 +20,7 @@ export interface UserActivitySkill {
   user_id: string
   activity_id: string
   skill_level: 'Beginner' | 'Intermediate' | 'Advanced'
+  ready_today?: boolean
   created_at?: string
   updated_at?: string
 }

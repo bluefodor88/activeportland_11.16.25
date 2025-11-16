@@ -14,6 +14,8 @@ import {
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '@/hooks/useAuth'
+import { useProfile } from '@/hooks/useProfile'
+import { ActivitySelectionModal } from '@/components/ActivitySelectionModal'
 
 const { width } = Dimensions.get('window');
 const isSmallDevice = width < 375; // iPhone SE and smaller
@@ -25,7 +27,10 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [signupComplete, setSignupComplete] = useState(false);
   const { signUp } = useAuth()
+  const { refetch } = useProfile()
 
   const handleSignup = async () => {
     if (!email || !password || !confirmPassword || !name) {
@@ -49,12 +54,15 @@ export default function SignupScreen() {
       
       if (error) {
         Alert.alert('Error', error.message)
+        setLoading(false);
       } else {
-        router.replace('/(tabs)')
+        // Account created successfully, now show activity selection
+        setSignupComplete(true);
+        setLoading(false);
+        setShowActivityModal(true);
       }
     } catch (error) {
       Alert.alert('Error', 'Signup failed. Please try again.');
-    } finally {
       setLoading(false);
     }
   };
@@ -144,6 +152,22 @@ export default function SignupScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <ActivitySelectionModal
+        visible={showActivityModal && signupComplete}
+        onClose={() => {
+          // After selecting at least one activity, navigate to main app
+          if (signupComplete) {
+            refetch();
+            router.replace('/(tabs)');
+          }
+        }}
+        onSuccess={() => {
+          refetch();
+          // Navigate to main app after selecting first activity
+          router.replace('/(tabs)');
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }

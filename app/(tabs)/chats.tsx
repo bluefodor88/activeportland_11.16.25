@@ -12,7 +12,6 @@ import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useChats } from '@/hooks/useChats';
-import { ActivityHeader } from '@/components/ActivityHeader';
 import { useMeetingReminder } from '@/contexts/MeetingReminderContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
@@ -87,7 +86,6 @@ export default function ChatsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <ActivityHeader />
       <View style={styles.header}>
         <View style={styles.headerGradient} />
         <Text style={styles.title}>Chats</Text>

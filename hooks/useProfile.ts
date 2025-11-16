@@ -45,7 +45,13 @@ export function useProfile() {
       const { data, error } = await supabase
         .from('user_activity_skills')
         .select(`
-          *,
+          id,
+          user_id,
+          activity_id,
+          skill_level,
+          ready_today,
+          created_at,
+          updated_at,
           activities (
             name,
             emoji
@@ -55,32 +61,66 @@ export function useProfile() {
 
       if (error) {
         console.error('Error fetching user skills:', error)
+        setUserSkills([]) // Set empty array on error to prevent crashes
       } else {
+        console.log('Fetched user skills:', data)
         setUserSkills(data || [])
       }
     } catch (error) {
       console.error('Error fetching user skills:', error)
+      setUserSkills([]) // Set empty array on error to prevent crashes
     }
   }
 
-  const updateSkillLevel = async (activityId: string, skillLevel: 'Beginner' | 'Intermediate' | 'Advanced') => {
-    if (!user) return
+  const updateSkillLevel = async (activityId: string, skillLevel: 'Beginner' | 'Intermediate' | 'Advanced', readyToday?: boolean) => {
+    if (!user) return false
 
-    console.log('updateSkillLevel called with:', { userId: user.id, activityId, skillLevel });
+    console.log('updateSkillLevel called with:', { userId: user.id, activityId, skillLevel, readyToday });
 
     try {
-      const { error } = await supabase
+      // First check if the row exists
+      const { data: existing, error: checkError } = await supabase
         .from('user_activity_skills')
-        .upsert({
-          user_id: user.id,
-          activity_id: activityId,
-          skill_level: skillLevel,
-        }, {
-          onConflict: 'user_id,activity_id'
-        })
+        .select('id, skill_level')
+        .eq('user_id', user.id)
+        .eq('activity_id', activityId)
+        .maybeSingle()
+
+      const updateData = {
+        user_id: user.id,
+        activity_id: activityId,
+        skill_level: skillLevel,
+        ready_today: readyToday ?? false,
+      }
+
+      let error
+      if (checkError && checkError.code !== 'PGRST116') {
+        // PGRST116 means no rows found, which is fine
+        console.error('Error checking existing skill:', checkError)
+      }
+
+      if (existing) {
+        // Row exists, update it
+        const { error: updateError } = await supabase
+          .from('user_activity_skills')
+          .update({
+            skill_level: skillLevel,
+            ready_today: readyToday ?? false,
+          })
+          .eq('user_id', user.id)
+          .eq('activity_id', activityId)
+        error = updateError
+      } else {
+        // Row doesn't exist, insert it
+        const { error: insertError } = await supabase
+          .from('user_activity_skills')
+          .insert(updateData)
+        error = insertError
+      }
 
       if (error) {
         console.error('Error updating skill level:', error)
+        console.error('Error details:', JSON.stringify(error, null, 2))
         return false
       } else {
         // Force refresh both profile and skills data
@@ -90,6 +130,51 @@ export function useProfile() {
       }
     } catch (error) {
       console.error('Error updating skill level:', error)
+      return false
+    }
+  }
+
+  const updateReadyToday = async (activityId: string, readyToday: boolean) => {
+    if (!user) return false
+
+    try {
+      // First, get the existing skill level to preserve it
+      const { data: existingData, error: fetchError } = await supabase
+        .from('user_activity_skills')
+        .select('skill_level')
+        .eq('user_id', user.id)
+        .eq('activity_id', activityId)
+        .single()
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        // PGRST116 means no rows found - that's okay, we'll create a new one
+        console.error('Error fetching existing skill:', fetchError)
+      }
+
+      // If no existing row, we need a skill level - default to Beginner
+      const skillLevel = existingData?.skill_level || 'Beginner'
+
+      const { error } = await supabase
+        .from('user_activity_skills')
+        .upsert({
+          user_id: user.id,
+          activity_id: activityId,
+          skill_level: skillLevel,
+          ready_today: readyToday,
+        }, {
+          onConflict: 'user_id,activity_id'
+        })
+
+      if (error) {
+        console.error('Error updating ready_today:', error)
+        console.error('Error details:', JSON.stringify(error, null, 2))
+        return false
+      } else {
+        await fetchUserSkills() // Refresh skills
+        return true
+      }
+    } catch (error) {
+      console.error('Error updating ready_today:', error)
       return false
     }
   }
@@ -119,6 +204,7 @@ export function useProfile() {
     userSkills,
     loading,
     updateSkillLevel,
+    updateReadyToday,
     removeActivity,
     refetch: () => {
       fetchProfile()

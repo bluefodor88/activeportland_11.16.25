@@ -21,7 +21,7 @@ import { useForumMessages } from '@/hooks/useForumMessages';
 import { useProfile } from '@/hooks/useProfile';
 import { getOrCreateChat } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
-import { ActivityHeader } from '@/components/ActivityHeader';
+import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 
@@ -148,7 +148,7 @@ export default function ForumScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
-        <ActivityHeader />
+        <ActivityCarousel />
         <View style={styles.loadingContainer}>
           <LoadingSpinner size={32} />
           <Text style={[styles.loadingText, { marginTop: 16 }]}>Loading messages...</Text>
@@ -160,7 +160,7 @@ export default function ForumScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <ActivityHeader />
+      <ActivityCarousel />
       <KeyboardAvoidingView 
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -169,9 +169,9 @@ export default function ForumScreen() {
           <View style={styles.headerGradient} />
           <View style={styles.titleContainer}>
             <Text style={styles.title}>Forum</Text>
-            <Text style={styles.description}>Connect with everyone in your area to share tips and build community</Text>
-          </View>
-          <View style={styles.userSkillContainer}>
+            <Text style={styles.description} numberOfLines={2}>
+              Connect with everyone in your area to share tips and build community
+            </Text>
           </View>
         </View>
 
@@ -240,40 +240,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     position: 'relative',
-    overflow: 'hidden',
+    overflow: 'visible',
+    zIndex: 1,
   },
   headerGradient: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 4,
+    height: 3,
     backgroundColor: '#FF8C42',
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: 'Inter_700Bold',
     color: '#333',
-    textShadowColor: 'rgba(255, 140, 66, 0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    marginBottom: 4,
   },
   titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-   gap: 12,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    justifyContent: 'flex-start',
+    width: '100%',
   },
   description: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: 'Inter_400Regular',
     color: '#666',
-    fontStyle: 'italic',
+    lineHeight: 14,
+    width: '100%',
   },
   subtitle: {
     fontSize: 14,

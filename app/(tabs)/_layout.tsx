@@ -78,9 +78,15 @@ export default function TabLayout() {
           <Tabs.Screen
             name="index"
             options={{
-              title: 'Activities',
+              href: null, // Hide from tab bar
+            }}
+          />
+          <Tabs.Screen
+            name="profile"
+            options={{
+              title: 'Profile',
               tabBarIcon: ({ size, color }) => (
-                <Ionicons name="fitness-outline" size={size} color={color} />
+                <Ionicons name="person-outline" size={size} color={color} />
               ),
             }}
           />
@@ -108,15 +114,6 @@ export default function TabLayout() {
               title: 'Chats',
               tabBarIcon: ({ size, color }) => (
                 <ChatTabIcon size={size} color={color} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="profile"
-            options={{
-              title: 'Profile',
-              tabBarIcon: ({ size, color }) => (
-                <Ionicons name="person-outline" size={size} color={color} />
               ),
             }}
           />

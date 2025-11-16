@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useState, ReactNode, useCallback, useMemo } from 'react'
 
 interface ActivityContextType {
   activityId?: string
@@ -27,22 +27,33 @@ export function ActivityProvider({ children }: ActivityProviderProps) {
     emoji?: string
   }>({})
 
-  const setActivityContext = (params: {
+  const setActivityContext = useCallback((params: {
     activityId: string
     activity: string
     skillLevel: string
     emoji: string
   }) => {
-    setActivityContextState(params)
-  }
+    setActivityContextState(prev => {
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (
+        prev.activityId === params.activityId &&
+        prev.activity === params.activity &&
+        prev.skillLevel === params.skillLevel &&
+        prev.emoji === params.emoji
+      ) {
+        return prev;
+      }
+      return params;
+    });
+  }, []);
 
-  const value = {
+  const value = useMemo(() => ({
     activityId: activityContext.activityId,
     activity: activityContext.activity,
     skillLevel: activityContext.skillLevel,
     emoji: activityContext.emoji,
     setActivityContext
-  }
+  }), [activityContext.activityId, activityContext.activity, activityContext.skillLevel, activityContext.emoji, setActivityContext]);
 
   return (
     <ActivityContext.Provider value={value}>

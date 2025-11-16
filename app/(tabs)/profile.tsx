@@ -9,7 +9,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -17,14 +17,29 @@ import { useProfile } from '@/hooks/useProfile';
 import { useAuth } from '@/hooks/useAuth';
 import { useActivities } from '@/hooks/useActivities';
 import { supabase } from '@/lib/supabase';
+import { useCallback } from 'react';
+import { ActivitySelectionModal } from '@/components/ActivitySelectionModal';
 
 const skillLevels = ['Beginner', 'Intermediate', 'Advanced'];
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const { profile, userSkills, loading, updateSkillLevel, refetch } = useProfile();
+  const { profile, userSkills, loading, updateSkillLevel, updateReadyToday, refetch } = useProfile();
   const { activities } = useActivities();
   const [profileImage, setProfileImage] = useState('https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2');
+  const [showActivityModal, setShowActivityModal] = useState(false);
+
+  // Refresh profile data when tab comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  // Get list of activity IDs user has already selected
+  const selectedActivityIds = userSkills
+    .map((skill) => skill.activity_id)
+    .filter(Boolean);
 
   const requestPermissions = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -324,39 +339,92 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Activity Skill Levels</Text>
-          <Text style={styles.sectionSubtitle}>Tap to change your skill level</Text>
-          {userSkills.map((userSkill) => {
-            if (!userSkill.activities) return null;
-            
+          <View style={styles.addButtonContainer}>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowActivityModal(true)}
+            >
+              <Ionicons name="add" size={20} color="white" />
+              <Text style={styles.addButtonText}>Add Activity</Text>
+            </TouchableOpacity>
+          </View>
+          {userSkills
+            .filter((userSkill) => userSkill.activities) // Filter out any without activities
+            .sort((a, b) => {
+              // Sort alphabetically by activity name
+              const nameA = a.activities?.name || '';
+              const nameB = b.activities?.name || '';
+              return nameA.localeCompare(nameB);
+            })
+            .map((userSkill) => {
             return (
-              <TouchableOpacity
-                key={userSkill.id}
-                style={styles.skillItem}
-                onPress={() => handleSkillLevelChange(userSkill.activities!.name)}
-              >
-                <View style={styles.skillInfo}>
-                  <Text style={styles.activityEmoji}>{userSkill.activities.emoji}</Text>
-                  <Text style={styles.activityName}>{userSkill.activities.name}</Text>
-                  <View style={[styles.skillBadge, { backgroundColor: getSkillColor(userSkill.skill_level) }]}>
-                    <Text style={styles.skillText}>{userSkill.skill_level}</Text>
-                  </View>
-                </View>
+              <View key={userSkill.id} style={styles.skillItemContainer}>
                 <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveActivity(userSkill.activity_id, userSkill.activities!.name)}
+                  style={styles.skillItem}
+                  onPress={() => handleSkillLevelChange(userSkill.activities!.name)}
                 >
-                  <Text style={styles.removeText}>Remove</Text>
+                  <View style={styles.skillInfo}>
+                    <Text style={styles.activityEmoji}>{userSkill.activities.emoji}</Text>
+                    <Text style={styles.activityName}>{userSkill.activities.name}</Text>
+                    <View style={[styles.skillBadge, { backgroundColor: getSkillColor(userSkill.skill_level) }]}>
+                      <Text style={styles.skillText}>{userSkill.skill_level}</Text>
+                    </View>
+                  </View>
                 </TouchableOpacity>
-              </TouchableOpacity>
+                <View style={styles.skillItemActions}>
+                  <TouchableOpacity
+                    style={[styles.readyToggle, userSkill.ready_today && styles.readyToggleActive]}
+                    onPress={async () => {
+                      const success = await updateReadyToday(userSkill.activity_id, !userSkill.ready_today);
+                      if (!success) {
+                        Alert.alert('Error', 'Failed to update ready status. Please try again.');
+                      }
+                    }}
+                  >
+                    <Ionicons 
+                      name={userSkill.ready_today ? "checkmark-circle" : "ellipse-outline"} 
+                      size={16} 
+                      color={userSkill.ready_today ? "white" : "#666"} 
+                    />
+                    <Text style={[styles.readyToggleText, userSkill.ready_today && styles.readyToggleTextActive]}>
+                      Ready Today
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveActivity(userSkill.activity_id, userSkill.activities!.name)}
+                  >
+                    <Text style={styles.removeText}>Remove</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             );
           })}
           {userSkills.length === 0 && (
-            <Text style={styles.noActivitiesText}>
-              No activities selected yet. Choose an activity from the Activities tab to get started!
-            </Text>
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.noActivitiesText}>
+                No activities selected yet.
+              </Text>
+              <TouchableOpacity
+                style={styles.addFirstButton}
+                onPress={() => setShowActivityModal(true)}
+              >
+                <Ionicons name="add-circle" size={20} color="white" />
+                <Text style={styles.addFirstButtonText}>Add Your First Activity</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
+
+        <ActivitySelectionModal
+          visible={showActivityModal}
+          onClose={() => setShowActivityModal(false)}
+          onSuccess={() => {
+            refetch();
+            setShowActivityModal(false);
+          }}
+          excludeActivityIds={selectedActivityIds}
+        />
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Settings</Text>
@@ -450,28 +518,60 @@ const styles = StyleSheet.create({
     elevation: 4,
     transform: [{ scale: 1 }],
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter_700Bold',
-    color: '#333',
+  addButtonContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 16,
-    textShadowColor: 'rgba(255, 140, 66, 0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
   },
-  sectionSubtitle: {
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF8C42',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    gap: 6,
+  },
+  addButtonText: {
     fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-    color: '#666',
-    marginBottom: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: 'white',
+  },
+  emptyStateContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  addFirstButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF8C42',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 16,
+    gap: 8,
+  },
+  addFirstButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    color: 'white',
+  },
+  skillItemContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingVertical: 12,
   },
   skillItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginBottom: 8,
+  },
+  skillItemActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
   },
   skillInfo: {
     flexDirection: 'row',
@@ -530,5 +630,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
     paddingVertical: 20,
+  },
+  readyToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  readyToggleActive: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  readyToggleText: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#666',
+    marginLeft: 4,
+  },
+  readyToggleTextActive: {
+    color: 'white',
   },
 });

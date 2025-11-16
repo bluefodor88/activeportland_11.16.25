@@ -17,6 +17,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
       'X-Client-Info': 'activeportland-app',
+      'Accept': 'application/json',
     },
   },
 })

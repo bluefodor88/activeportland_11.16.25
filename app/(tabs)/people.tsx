@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import { usePeople } from '@/hooks/usePeople';
 import { useLocationTracking } from '@/hooks/useLocationTracking';
 import { getOrCreateChat } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
-import { ActivityHeader } from '@/components/ActivityHeader';
+import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 
 
@@ -60,14 +60,16 @@ export default function PeopleScreen() {
     <View style={styles.userCard}>
       <Image source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2' }} style={styles.avatar} />
       <View style={styles.userInfo}>
-        <Text style={styles.userName}>{item.name}</Text>
+        <View style={styles.userNameRow}>
+          <Text style={styles.userName}>{item.name}</Text>
+        </View>
         <View style={styles.skillContainer}>
           <View style={[styles.skillBadge, { backgroundColor: getSkillColor(item.skill_level) }]}>
             <Text style={styles.skillText}>{item.skill_level}</Text>
           </View>
         </View>
         <View style={styles.distanceContainer}>
-                <Ionicons name="location" size={14} color="#666" />
+          <Ionicons name="location" size={14} color="#666" />
           <Text style={styles.distanceText}>{item.distance}</Text>
         </View>
       </View>
@@ -77,7 +79,7 @@ export default function PeopleScreen() {
           openChat(item.id, item.name);
         }}
       >
-                <Ionicons name="chatbubble" size={20} color="white" />
+        <Ionicons name="chatbubble" size={20} color="white" />
       </TouchableOpacity>
     </View>
   );
@@ -97,12 +99,14 @@ export default function PeopleScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <ActivityHeader />
+      <ActivityCarousel />
       <View style={styles.header}>
         <View style={styles.headerGradient} />
-        <Text style={styles.title}>
-          People Nearby
-        </Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.title}>
+            People Nearby
+          </Text>
+        </View>
         {!locationPermission && (
           <TouchableOpacity 
             style={styles.locationButton} 
@@ -194,6 +198,11 @@ const styles = StyleSheet.create({
     elevation: 2,
     transform: [{ scale: 1 }],
   },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   avatar: {
     width: 60,
     height: 60,
@@ -203,11 +212,17 @@ const styles = StyleSheet.create({
   userInfo: {
     flex: 1,
   },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
   userName: {
     fontSize: 16,
     fontFamily: 'Inter_700Bold',
     color: '#333',
-    marginBottom: 4,
+    flex: 1,
   },
   skillContainer: {
     flexDirection: 'row',
