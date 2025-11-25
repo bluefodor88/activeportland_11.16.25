@@ -70,7 +70,7 @@ export function useForumMessages(activityId?: string) {
         `)
         .eq('activity_id', activityId)
         .eq('profiles.user_activity_skills.activity_id', activityId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error fetching forum messages:', error)

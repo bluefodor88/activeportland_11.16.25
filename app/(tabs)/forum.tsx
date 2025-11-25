@@ -178,6 +178,7 @@ export default function ForumScreen() {
 
         {activityId ? (
           <FlatList
+            inverted
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
