@@ -8,6 +8,7 @@ export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [userSkills, setUserSkills] = useState<UserActivitySkill[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
 
   const fetchProfile = useCallback(async () => {
     if (!user) return
@@ -207,6 +208,56 @@ export function useProfile() {
     }
   }
 
+  const uploadProfileImage = async (uri: string) => {
+    try {
+      setUploading(true);
+      if (!user) return { success: false, error: 'No user' };
+
+      // 1. Use standard fetch to get the file data
+      const response = await fetch(uri);
+      
+      // 2. Convert to ArrayBuffer (Supabase accepts this directly)
+      const arrayBuffer = await response.arrayBuffer();
+
+      const filePath = `${user.id}/${new Date().getTime()}.png`;
+      const contentType = 'image/png';
+
+      // 3. Upload the ArrayBuffer directly
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, arrayBuffer, { 
+          contentType,
+          upsert: true 
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 4. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 5. Update Profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // 6. Refresh
+      await fetchProfile();
+      
+      return { success: true, publicUrl };
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      return { success: false, error: error.message };
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const refetch = useCallback(() => {
     fetchProfile()
     fetchUserSkills()
@@ -216,9 +267,11 @@ export function useProfile() {
     profile,
     userSkills,
     loading,
+    uploading,
     updateSkillLevel,
     updateReadyToday,
     removeActivity,
+    uploadProfileImage,
     refetch
   }
 }

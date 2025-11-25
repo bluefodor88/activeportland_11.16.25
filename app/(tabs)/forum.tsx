@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Image,
   Alert,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -146,7 +146,7 @@ export default function ForumScreen() {
   // Only show loading if we have an activity but messages are still loading
   if (loading && activityId) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
         <ActivityCarousel />
         <View style={styles.loadingContainer}>
@@ -158,7 +158,7 @@ export default function ForumScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
       <ActivityCarousel />
       <KeyboardAvoidingView 
