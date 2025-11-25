@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
-import { useActivityContext } from '@/contexts/ActivityContext'
+import { useActivityStore } from '@/store/useActivityStore';
 
 interface ScheduledEvent {
   id: string
@@ -27,7 +27,7 @@ interface ScheduledEvent {
 
 export function useScheduledEvents() {
   const { user } = useAuth()
-  const { activityId } = useActivityContext()
+  const { activityId } = useActivityStore()
   const [events, setEvents] = useState<ScheduledEvent[]>([])
   const [loading, setLoading] = useState(true)
 

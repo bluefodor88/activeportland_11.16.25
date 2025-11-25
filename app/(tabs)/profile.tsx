@@ -4,11 +4,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,14 +20,12 @@ import { useActivities } from '@/hooks/useActivities';
 import { supabase } from '@/lib/supabase';
 import { useCallback } from 'react';
 import { ActivitySelectionModal } from '@/components/ActivitySelectionModal';
-
-const skillLevels = ['Beginner', 'Intermediate', 'Advanced'];
+import { ICONS } from '@/lib/helperUtils';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
-  const { profile, userSkills, loading, updateSkillLevel, updateReadyToday, refetch } = useProfile();
+  const { profile, userSkills, loading, uploading, updateSkillLevel, updateReadyToday, uploadProfileImage, refetch } = useProfile();
   const { activities } = useActivities();
-  const [profileImage, setProfileImage] = useState('https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=200&h=200&dpr=2');
   const [showActivityModal, setShowActivityModal] = useState(false);
 
   // Refresh profile data when tab comes into focus
@@ -50,51 +49,46 @@ export default function ProfileScreen() {
     return true;
   };
 
-  const pickImageFromLibrary = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
+  const handleImageSelection = async (type: 'library' | 'camera') => {
+    if (type === 'library') {
+      const hasPermission = await requestPermissions();
+      if (!hasPermission) return;
+    } else {
+       const { status } = await ImagePicker.requestCameraPermissionsAsync();
+       if (status !== 'granted') {
+          Alert.alert('Permission Required', 'We need camera access.');
+          return;
+       }
+    }
 
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      let result;
+      const options: ImagePicker.ImagePickerOptions = {
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
-      });
+        quality: 0.5,
+      };
+      
+      if (type === 'library') {
+        result = await ImagePicker.launchImageLibraryAsync(options);
+      } else {
+        result = await ImagePicker.launchCameraAsync(options);
+      }
 
       if (!result.canceled && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-        setProfileImage(imageUri);
-        Alert.alert('Success', 'Profile photo updated! (Note: This is stored locally for now)');
+        // Call the hook function
+        const response = await uploadProfileImage(result.assets[0].uri);
+        
+        if (response.success) {
+          Alert.alert('Success', 'Profile photo updated!');
+        } else {
+          Alert.alert('Error', response.error || 'Failed to upload image');
+        }
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
-    }
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission Required', 'Sorry, we need camera permissions to take a photo.');
-      return;
-    }
-
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const imageUri = result.assets[0].uri;
-        setProfileImage(imageUri);
-        Alert.alert('Success', 'Profile photo updated! (Note: This is stored locally for now)');
-      }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      Alert.alert('Error', 'Failed to select image.');
     }
   };
 
@@ -103,8 +97,8 @@ export default function ProfileScreen() {
       'Change Profile Photo',
       'Choose an option',
       [
-        { text: 'Camera', onPress: takePhoto },
-        { text: 'Photo Library', onPress: pickImageFromLibrary },
+        { text: 'Camera', onPress: () => handleImageSelection('camera') },
+        { text: 'Photo Library', onPress: () => handleImageSelection('library') },
         { text: 'Cancel', style: 'cancel' },
       ]
     );
@@ -314,7 +308,7 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading profile...</Text>
@@ -324,12 +318,21 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.imageContainer} onPress={handleImageUpload}>
-            <Image source={{ uri: profile?.avatar_url || profileImage }} style={styles.profileImage} />
+          <TouchableOpacity style={styles.imageContainer} onPress={handleImageUpload} disabled={uploading}>
+            {uploading ? (
+              <View style={[styles.profileImage, styles.uploadingOverlay]}>
+                 <ActivityIndicator color="#FF8C42" />
+              </View>
+            ) : (
+              <Image 
+                source={ profile?.avatar_url ? { uri: profile?.avatar_url } : ICONS.profileIcon } 
+                style={styles.profileImage} 
+              />
+            )}
             <View style={styles.cameraIconContainer}>
                 <Ionicons name="camera" size={16} color="white" />
             </View>
@@ -419,7 +422,7 @@ export default function ProfileScreen() {
         <ActivitySelectionModal
           visible={showActivityModal}
           onClose={() => setShowActivityModal(false)}
-          onSuccess={() => {
+          onComplete={() => {
             refetch();
             setShowActivityModal(false);
           }}
@@ -466,6 +469,11 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
+  },
+  uploadingOverlay: {
+    backgroundColor: '#eee',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cameraIconContainer: {
     position: 'absolute',

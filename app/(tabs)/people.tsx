@@ -1,31 +1,40 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useActivityContext } from '@/contexts/ActivityContext';
 import { usePeople } from '@/hooks/usePeople';
 import { useLocationTracking } from '@/hooks/useLocationTracking';
 import { getOrCreateChat } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useActivityStore } from '@/store/useActivityStore';
+import { ICONS } from '@/lib/helperUtils';
 
 
 export default function PeopleScreen() {
-  const { activityId, activity, skillLevel, emoji } = useActivityContext();
+  const { activityId, activity, skillLevel, emoji } = useActivityStore();
   const { user } = useAuth();
   const { location, locationPermission, updateLocation, requestLocationPermission } = useLocationTracking();
 
   const { people, loading, refetch } = usePeople();
+
+  const sortedPeople = useMemo(() => {
+    return [...(people || [])].sort((a, b) => {
+      if (a.ready_today && !b.ready_today) return -1;
+      if (!a.ready_today && b.ready_today) return 1;
+      return 0;
+    });
+  }, [people]);
 
   const openChat = async (userId: string, userName: string) => {
     if (!user) return;
@@ -58,7 +67,7 @@ export default function PeopleScreen() {
 
   const renderUser = ({ item }: { item: any }) => (
     <View style={styles.userCard}>
-      <Image source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2' }} style={styles.avatar} />
+      <Image source={ item?.avatar_url ? { uri: item.avatar_url } : ICONS.profileIcon } style={styles.avatar} />
       <View style={styles.userInfo}>
         <View style={styles.userNameRow}>
           <Text style={styles.userName}>{item.name}</Text>
@@ -86,8 +95,9 @@ export default function PeopleScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
+        <ActivityCarousel />
         <View style={styles.loadingContainer}>
           <LoadingSpinner size={32} />
           <Text style={[styles.loadingText, { marginTop: 16 }]}>Loading people...</Text>
@@ -97,9 +107,10 @@ export default function PeopleScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
       <ActivityCarousel />
+
       <View style={styles.header}>
         <View style={styles.headerGradient} />
         <View style={styles.headerTop}>
@@ -123,7 +134,7 @@ export default function PeopleScreen() {
       </View>
 
       <FlatList
-        data={people}
+        data={sortedPeople ?? []}
         renderItem={renderUser}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}

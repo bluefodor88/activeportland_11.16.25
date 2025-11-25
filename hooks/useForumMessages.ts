@@ -56,7 +56,12 @@ export function useForumMessages(activityId?: string) {
           ),
           profiles (
             name,
-            avatar_url
+            avatar_url,
+            user_activity_skills (
+              skill_level,
+              ready_today,
+              activity_id
+            )
           ),
           activities (
             name,
@@ -64,7 +69,8 @@ export function useForumMessages(activityId?: string) {
           )
         `)
         .eq('activity_id', activityId)
-        .order('created_at', { ascending: true })
+        .eq('profiles.user_activity_skills.activity_id', activityId)
+        .order('created_at', { ascending: false })
 
       if (error) {
         console.error('Error fetching forum messages:', error)

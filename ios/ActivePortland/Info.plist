@@ -33,7 +33,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>35</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -49,8 +49,14 @@
     </dict>
     <key>NSCameraUsageDescription</key>
     <string>ActivePortland uses the camera to let you take a profile photo, helping other activity partners recognize you at meetups and creating a safer, more connected community experience.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your location</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your location</string>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>ActivePortland uses your location to show distances to nearby activity partners, helping you find people close to you for convenient meetups and building local community connections.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Save your new profile photo to your photo library.</string>
     <key>NSPhotoLibraryUsageDescription</key>

@@ -78,7 +78,7 @@ export function useChats() {
             lastMessage: lastMessageData?.message || 'No messages yet',
             timestamp: new Date(lastMessageData?.created_at || chat.created_at),
             unreadCount: unreadCount || 0,
-            avatar: profileData?.avatar_url || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2',
+            avatar: profileData?.avatar_url ?? null,
             otherUserId: otherUserId
           }
         })

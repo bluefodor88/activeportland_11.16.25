@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 import type { Profile, UserActivitySkill } from '@/types/database'
@@ -8,15 +8,9 @@ export function useProfile() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [userSkills, setUserSkills] = useState<UserActivitySkill[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
 
-  useEffect(() => {
-    if (user) {
-      fetchProfile()
-      fetchUserSkills()
-    }
-  }, [user])
-
-  const fetchProfile = async () => {
+  const fetchProfile = useCallback(async () => {
     if (!user) return
 
     try {
@@ -24,10 +18,12 @@ export function useProfile() {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.error('Error fetching profile:', error)
+      } else if (data) {
+        setProfile(data)
       } else {
         setProfile(data)
       }
@@ -36,9 +32,9 @@ export function useProfile() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
 
-  const fetchUserSkills = async () => {
+  const fetchUserSkills = useCallback(async () => {
     if (!user) return
 
     try {
@@ -63,42 +59,55 @@ export function useProfile() {
         console.error('Error fetching user skills:', error)
         setUserSkills([]) // Set empty array on error to prevent crashes
       } else {
-        console.log('Fetched user skills:', data)
+        // console.log('Fetched user skills:', data)
         setUserSkills(data || [])
       }
     } catch (error) {
       console.error('Error fetching user skills:', error)
       setUserSkills([]) // Set empty array on error to prevent crashes
     }
-  }
+  }, [user])
 
-  const updateSkillLevel = async (activityId: string, skillLevel: 'Beginner' | 'Intermediate' | 'Advanced', readyToday?: boolean) => {
-    if (!user) return false
+  // Initial load
+  useEffect(() => {
+    if (user) {
+      fetchProfile()
+      fetchUserSkills()
+    }
+  }, [user, fetchProfile, fetchUserSkills])
 
-    console.log('updateSkillLevel called with:', { userId: user.id, activityId, skillLevel, readyToday });
+  const updateSkillLevel = async (activityId: string, skillLevel: 'Beginner' | 'Intermediate' | 'Advanced', readyToday?: boolean, manualUserId?: string) => {
+    const targetUserId = manualUserId || user?.id;
+
+    if (!targetUserId) {
+      console.log("No user ID found");
+      return false;
+    }
+
+    console.log('updateSkillLevel called with:', { userId: targetUserId, activityId, skillLevel, readyToday });
 
     try {
       // First check if the row exists
       const { data: existing, error: checkError } = await supabase
         .from('user_activity_skills')
         .select('id, skill_level')
-        .eq('user_id', user.id)
+        .eq('user_id', targetUserId)
         .eq('activity_id', activityId)
         .maybeSingle()
 
       const updateData = {
-        user_id: user.id,
+        user_id: targetUserId,
         activity_id: activityId,
         skill_level: skillLevel,
         ready_today: readyToday ?? false,
       }
 
-      let error
       if (checkError && checkError.code !== 'PGRST116') {
         // PGRST116 means no rows found, which is fine
         console.error('Error checking existing skill:', checkError)
       }
 
+      let error
       if (existing) {
         // Row exists, update it
         const { error: updateError } = await supabase
@@ -107,7 +116,7 @@ export function useProfile() {
             skill_level: skillLevel,
             ready_today: readyToday ?? false,
           })
-          .eq('user_id', user.id)
+          .eq('user_id', targetUserId)
           .eq('activity_id', activityId)
         error = updateError
       } else {
@@ -144,7 +153,7 @@ export function useProfile() {
         .select('skill_level')
         .eq('user_id', user.id)
         .eq('activity_id', activityId)
-        .single()
+        .maybeSingle()
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         // PGRST116 means no rows found - that's okay, we'll create a new one
@@ -199,16 +208,70 @@ export function useProfile() {
     }
   }
 
+  const uploadProfileImage = async (uri: string) => {
+    try {
+      setUploading(true);
+      if (!user) return { success: false, error: 'No user' };
+
+      // 1. Use standard fetch to get the file data
+      const response = await fetch(uri);
+      
+      // 2. Convert to ArrayBuffer (Supabase accepts this directly)
+      const arrayBuffer = await response.arrayBuffer();
+
+      const filePath = `${user.id}/${new Date().getTime()}.png`;
+      const contentType = 'image/png';
+
+      // 3. Upload the ArrayBuffer directly
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, arrayBuffer, { 
+          contentType,
+          upsert: true 
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 4. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // 5. Update Profile
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // 6. Refresh
+      await fetchProfile();
+      
+      return { success: true, publicUrl };
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      return { success: false, error: error.message };
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const refetch = useCallback(() => {
+    fetchProfile()
+    fetchUserSkills()
+  }, [fetchProfile, fetchUserSkills])
+
   return {
     profile,
     userSkills,
     loading,
+    uploading,
     updateSkillLevel,
     updateReadyToday,
     removeActivity,
-    refetch: () => {
-      fetchProfile()
-      fetchUserSkills()
-    }
+    uploadProfileImage,
+    refetch
   }
 }

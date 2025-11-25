@@ -16,16 +16,22 @@ const skillLevels = ['Beginner', 'Intermediate', 'Advanced'];
 
 interface ActivitySelectionModalProps {
   visible: boolean;
-  onClose: () => void;
-  onSuccess?: () => void;
+  onClose: () => void; // user skipped (closed)
+  onComplete?: (selectedActivities: Array<{
+    activityId: string;
+    skillLevel: 'Beginner' | 'Intermediate' | 'Advanced';
+    readyToday: boolean;
+  }>) => void; // returns selections when user confirms
   excludeActivityIds?: string[]; // Activities to exclude (already selected)
+  isSignup?: boolean; // to ensure the process is signup or not
 }
 
 export function ActivitySelectionModal({
   visible,
   onClose,
-  onSuccess,
+  onComplete,
   excludeActivityIds = [],
+  isSignup = false,
 }: ActivitySelectionModalProps) {
   const { activities, loading } = useActivities();
   const { updateSkillLevel } = useProfile();
@@ -33,6 +39,7 @@ export function ActivitySelectionModal({
   const [showSkillModal, setShowSkillModal] = useState(false);
   const [selectedSkillLevel, setSelectedSkillLevel] = useState<string | null>(null);
   const [readyToday, setReadyToday] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const getSkillColor = (skillLevel: string) => {
     switch (skillLevel) {
@@ -68,48 +75,39 @@ export function ActivitySelectionModal({
       Alert.alert('Error', 'Please select a skill level');
       return;
     }
+    
+    setIsSubmitting(true);
 
     try {
-      console.log('Submitting activity:', {
+      // Build the selection object
+      const selection = {
         activityId: selectedActivity.id,
-        activityName: selectedActivity.name,
-        skillLevel: selectedSkillLevel,
-        readyToday,
-      });
-
-      // Don't hide modal yet - wait for success
-      const success = await updateSkillLevel(
-        selectedActivity.id,
-        selectedSkillLevel as 'Beginner' | 'Intermediate' | 'Advanced',
+        skillLevel: selectedSkillLevel as 'Beginner' | 'Intermediate' | 'Advanced',
         readyToday
-      );
+      };
 
-      if (!success) {
-        Alert.alert('Error', 'Failed to add activity. Please try again.');
-        // Keep modal open so user can try again
-        return;
+      if(!isSignup){
+        await updateSkillLevel(selection.activityId, selection.skillLevel, readyToday);
       }
 
-      // Success - reset state and close
+      // Return selection to parent to handle account creation & DB writes
+      if (onComplete) {
+        onComplete([selection]);
+      }
+
+      // Reset local state and close modal
       setShowSkillModal(false);
       setSelectedActivity(null);
       setSelectedSkillLevel(null);
       setReadyToday(false);
-
-      // Call success callback
-      if (onSuccess) {
-        onSuccess();
-      }
-
-      // Close modal
-      onClose();
     } catch (error) {
       console.error('Error in handleSubmit:', error);
       Alert.alert(
         'Error', 
         `An unexpected error occurred: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`
       );
-      // Keep modal open so user can try again
+    } finally{
+      setIsSubmitting(false);
     }
   };
 
@@ -117,7 +115,7 @@ export function ActivitySelectionModal({
   const availableActivities = activities.filter(
     (activity) => !excludeActivityIds.includes(activity.id)
   );
-
+  
   return (
     <Modal
       visible={visible}
@@ -176,6 +174,7 @@ export function ActivitySelectionModal({
                   setSelectedSkillLevel(null);
                   setReadyToday(false);
                 }}
+                disabled={isSubmitting}
               >
                 <Ionicons name="arrow-back" size={24} color="#333" />
               </TouchableOpacity>
@@ -198,7 +197,8 @@ export function ActivitySelectionModal({
                     <TouchableOpacity
                       key={skill}
                       style={styles.skillOption}
-                      onPress={() => handleSkillSelect(skill)}
+                      onPress={() => !isSubmitting && handleSkillSelect(skill)}
+                      disabled={isSubmitting}
                     >
                       <View
                         style={[
@@ -219,7 +219,8 @@ export function ActivitySelectionModal({
                 <View style={styles.readyTodayContainer}>
                   <TouchableOpacity
                     style={styles.readyTodayCheckbox}
-                    onPress={() => setReadyToday(!readyToday)}
+                    onPress={() => !isSubmitting && setReadyToday(!readyToday)}
+                    disabled={isSubmitting}
                   >
                     <View
                       style={[
@@ -238,16 +239,16 @@ export function ActivitySelectionModal({
                 <TouchableOpacity
                   style={[
                     styles.submitButton,
-                    !selectedSkillLevel && styles.submitButtonDisabled,
+                    (!selectedSkillLevel || isSubmitting) && styles.submitButtonDisabled,
                   ]}
                   onPress={handleSubmit}
-                  disabled={!selectedSkillLevel}
+                  disabled={!selectedSkillLevel || isSubmitting}
                 >
                   <Text style={[
                     styles.submitButtonText,
-                    !selectedSkillLevel && styles.submitButtonTextDisabled,
+                    (!selectedSkillLevel || isSubmitting) && styles.submitButtonTextDisabled,
                   ]}>
-                    Confirm
+                    {isSubmitting ? 'Saving...' : 'Confirm'}
                   </Text>
                 </TouchableOpacity>
 
@@ -258,8 +259,12 @@ export function ActivitySelectionModal({
                     setSelectedSkillLevel(null);
                     setReadyToday(false);
                   }}
+                  disabled={isSubmitting}
                 >
-                  <Text style={styles.cancelText}>Cancel</Text>
+                  <Text style={[
+                    styles.cancelText,
+                    isSubmitting && { color: '#ccc' }
+                  ]}>Cancel</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
@@ -505,4 +510,3 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 });
-

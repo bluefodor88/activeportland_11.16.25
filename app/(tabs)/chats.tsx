@@ -5,15 +5,16 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useChats } from '@/hooks/useChats';
 import { useMeetingReminder } from '@/contexts/MeetingReminderContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ICONS } from '@/lib/helperUtils';
 
 export default function ChatsScreen() {
   const { chats, loading } = useChats();
@@ -51,7 +52,7 @@ export default function ChatsScreen() {
       style={styles.chatItem}
       onPress={() => openChat(item.id, item.name, item.otherUserId)}
     >
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
+      <Image source={ item.avatar ? { uri: item.avatar } : ICONS.profileIcon } style={styles.avatar} />
       
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
@@ -73,7 +74,7 @@ export default function ChatsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
         <View style={styles.loadingContainer}>
           <LoadingSpinner size={32} />
@@ -84,7 +85,7 @@ export default function ChatsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
       <View style={styles.header}>
         <View style={styles.headerGradient} />

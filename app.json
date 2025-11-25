@@ -10,7 +10,7 @@
       "android",
       "web"
     ],
-    "jsEngine": "jsc",
+    "jsEngine": "hermes",
     "assetBundlePatterns": [
       "**/*"
     ],
@@ -38,7 +38,8 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION"
-      ]
+      ],
+      "package": "com.campbell3c2.activeportland"
     },
     "web": {
       "bundler": "metro"

@@ -6,27 +6,28 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Image,
   Alert,
   Pressable,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useActivityContext } from '@/contexts/ActivityContext';
 import { useForumMessages } from '@/hooks/useForumMessages';
 import { useProfile } from '@/hooks/useProfile';
 import { getOrCreateChat } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useActivityStore } from '@/store/useActivityStore';
+import { ICONS } from '@/lib/helperUtils';
 
 
 export default function ForumScreen() {
-  const { activityId, activity, skillLevel, emoji } = useActivityContext();
+  const { activityId, activity, skillLevel, emoji } = useActivityStore();
 
   const { messages, loading, sendMessage } = useForumMessages(activityId);
   const { profile } = useProfile();
@@ -94,16 +95,16 @@ export default function ForumScreen() {
   };
 
   const renderMessage = ({ item }: { item: any }) => {
-    const isMe = item.profiles?.name === profile?.name;
+    const isMe = item.profiles?.name?.toLowerCase() === profile?.name?.toLowerCase();
     const userName = isMe ? 'You' : item.profiles?.name || 'Unknown';
-    const avatarUrl = item.profiles?.avatar_url || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2';
+    const avatarUrl = item.profiles?.avatar_url ?? null;
     
     // Get the user's skill level for this activity
     const getUserSkillLevel = () => {
       if (isMe) return skillLevel;
       // For other users, we'd need to join with user_activity_skills
       // For now, return a default
-      return 'Intermediate';
+      return item.profiles?.user_activity_skills?.[0]?.skill_level ?? "Intermediate";
     };
     
     const userSkillLevel = getUserSkillLevel();
@@ -126,7 +127,7 @@ export default function ForumScreen() {
           </Text>
         </View>
       )}
-      <Image source={{ uri: avatarUrl }} style={styles.messageAvatar} />
+      <Image source={ avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon} style={styles.messageAvatar} />
       <View style={styles.messageContent}>
       <View style={styles.messageHeader}>
         <TouchableOpacity onPress={() => openUserChat(item)}>
@@ -146,7 +147,7 @@ export default function ForumScreen() {
   // Only show loading if we have an activity but messages are still loading
   if (loading && activityId) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
         <ActivityCarousel />
         <View style={styles.loadingContainer}>
@@ -158,7 +159,7 @@ export default function ForumScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
       <ActivityCarousel />
       <KeyboardAvoidingView 
@@ -177,6 +178,7 @@ export default function ForumScreen() {
 
         {activityId ? (
           <FlatList
+            inverted
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
