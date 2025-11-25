@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useChats } from '@/hooks/useChats';
 import { useMeetingReminder } from '@/contexts/MeetingReminderContext';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { ICONS } from '@/lib/helperUtils';
 
 export default function ChatsScreen() {
   const { chats, loading } = useChats();
@@ -51,7 +52,7 @@ export default function ChatsScreen() {
       style={styles.chatItem}
       onPress={() => openChat(item.id, item.name, item.otherUserId)}
     >
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
+      <Image source={ item.avatar ? { uri: item.avatar } : ICONS.profileIcon } style={styles.avatar} />
       
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>

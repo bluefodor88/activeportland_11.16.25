@@ -23,6 +23,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useActivityStore } from '@/store/useActivityStore';
+import { ICONS } from '@/lib/helperUtils';
 
 
 export default function ForumScreen() {
@@ -94,16 +95,16 @@ export default function ForumScreen() {
   };
 
   const renderMessage = ({ item }: { item: any }) => {
-    const isMe = item.profiles?.name === profile?.name;
+    const isMe = item.profiles?.name?.toLowerCase() === profile?.name?.toLowerCase();
     const userName = isMe ? 'You' : item.profiles?.name || 'Unknown';
-    const avatarUrl = item.profiles?.avatar_url || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2';
+    const avatarUrl = item.profiles?.avatar_url ?? null;
     
     // Get the user's skill level for this activity
     const getUserSkillLevel = () => {
       if (isMe) return skillLevel;
       // For other users, we'd need to join with user_activity_skills
       // For now, return a default
-      return 'Intermediate';
+      return item.profiles?.user_activity_skills?.[0]?.skill_level ?? "Intermediate";
     };
     
     const userSkillLevel = getUserSkillLevel();
@@ -126,7 +127,7 @@ export default function ForumScreen() {
           </Text>
         </View>
       )}
-      <Image source={{ uri: avatarUrl }} style={styles.messageAvatar} />
+      <Image source={ avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon} style={styles.messageAvatar} />
       <View style={styles.messageContent}>
       <View style={styles.messageHeader}>
         <TouchableOpacity onPress={() => openUserChat(item)}>

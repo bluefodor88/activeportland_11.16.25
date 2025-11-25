@@ -18,6 +18,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useActivityStore } from '@/store/useActivityStore';
+import { ICONS } from '@/lib/helperUtils';
 
 
 export default function PeopleScreen() {
@@ -66,7 +67,7 @@ export default function PeopleScreen() {
 
   const renderUser = ({ item }: { item: any }) => (
     <View style={styles.userCard}>
-      <Image source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/774909/pexels-photo-774909.jpeg?auto=compress&cs=tinysrgb&w=150&h=150&dpr=2' }} style={styles.avatar} />
+      <Image source={ item?.avatar_url ? { uri: item.avatar_url } : ICONS.profileIcon } style={styles.avatar} />
       <View style={styles.userInfo}>
         <View style={styles.userNameRow}>
           <Text style={styles.userName}>{item.name}</Text>
