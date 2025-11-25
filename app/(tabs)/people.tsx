@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,21 +11,29 @@ import {
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useActivityContext } from '@/contexts/ActivityContext';
 import { usePeople } from '@/hooks/usePeople';
 import { useLocationTracking } from '@/hooks/useLocationTracking';
 import { getOrCreateChat } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useActivityStore } from '@/store/useActivityStore';
 
 
 export default function PeopleScreen() {
-  const { activityId, activity, skillLevel, emoji } = useActivityContext();
+  const { activityId, activity, skillLevel, emoji } = useActivityStore();
   const { user } = useAuth();
   const { location, locationPermission, updateLocation, requestLocationPermission } = useLocationTracking();
 
   const { people, loading, refetch } = usePeople();
+
+  const sortedPeople = useMemo(() => {
+    return [...(people || [])].sort((a, b) => {
+      if (a.ready_today && !b.ready_today) return -1;
+      if (!a.ready_today && b.ready_today) return 1;
+      return 0;
+    });
+  }, [people]);
 
   const openChat = async (userId: string, userName: string) => {
     if (!user) return;
@@ -88,6 +96,7 @@ export default function PeopleScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
+        <ActivityCarousel />
         <View style={styles.loadingContainer}>
           <LoadingSpinner size={32} />
           <Text style={[styles.loadingText, { marginTop: 16 }]}>Loading people...</Text>
@@ -100,6 +109,7 @@ export default function PeopleScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <ActivityCarousel />
+
       <View style={styles.header}>
         <View style={styles.headerGradient} />
         <View style={styles.headerTop}>
@@ -123,7 +133,7 @@ export default function PeopleScreen() {
       </View>
 
       <FlatList
-        data={people}
+        data={sortedPeople ?? []}
         renderItem={renderUser}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}

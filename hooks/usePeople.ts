@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
-import { useActivityContext } from '@/contexts/ActivityContext'
 import { calculateDistance, formatDistance, getCurrentLocation } from '@/lib/locationUtils'
 import type { Profile, UserActivitySkill } from '@/types/database'
+import { useActivityStore } from '@/store/useActivityStore';
 
 interface PersonWithSkill extends Profile {
   skill_level: string
@@ -14,7 +14,7 @@ interface PersonWithSkill extends Profile {
 
 export function usePeople() {
   const { user } = useAuth()
-  const { activityId } = useActivityContext()
+  const { activityId } = useActivityStore()
   const [people, setPeople] = useState<PersonWithSkill[]>([])
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null)

@@ -419,7 +419,7 @@ export default function ProfileScreen() {
         <ActivitySelectionModal
           visible={showActivityModal}
           onClose={() => setShowActivityModal(false)}
-          onSuccess={() => {
+          onComplete={() => {
             refetch();
             setShowActivityModal(false);
           }}

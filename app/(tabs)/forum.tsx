@@ -16,17 +16,17 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useActivityContext } from '@/contexts/ActivityContext';
 import { useForumMessages } from '@/hooks/useForumMessages';
 import { useProfile } from '@/hooks/useProfile';
 import { getOrCreateChat } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useActivityStore } from '@/store/useActivityStore';
 
 
 export default function ForumScreen() {
-  const { activityId, activity, skillLevel, emoji } = useActivityContext();
+  const { activityId, activity, skillLevel, emoji } = useActivityStore();
 
   const { messages, loading, sendMessage } = useForumMessages(activityId);
   const { profile } = useProfile();

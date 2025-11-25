@@ -28,11 +28,12 @@ export default function SignupScreen() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
-  const [signupComplete, setSignupComplete] = useState(false);
-  const { signUp } = useAuth()
-  const { refetch } = useProfile()
+  const [signupStarted, setSignupStarted] = useState(false);
+  const { signUp, user } = useAuth()
+  const { updateSkillLevel, refetch } = useProfile()
 
-  const handleSignup = async () => {
+  // When user presses the create account button -> open activity modal first
+  const handleSignupPress = () => {
     if (!email || !password || !confirmPassword || !name) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -48,21 +49,54 @@ export default function SignupScreen() {
       return;
     }
 
+    // Open modal to let user select or skip activities BEFORE creating account
+    setShowActivityModal(true);
+  };
+
+  const finishSignup = async (selectedActivities: any[]) => {
     setLoading(true);
+    setSignupStarted(true);
+
     try {
-      const { error } = await signUp(email, password, name)
-      
-      if (error) {
-        Alert.alert('Error', error.message)
+      // 1. Create the account
+      const { error, data } = await signUp(email, password, name);
+
+      if (error || !data?.user) {
+        Alert.alert('Signup Error', error?.message || 'Failed to create account');
         setLoading(false);
-      } else {
-        // Account created successfully, now show activity selection
-        setSignupComplete(true);
-        setLoading(false);
-        setShowActivityModal(true);
+        setSignupStarted(false);
+        return;
       }
-    } catch (error) {
-      Alert.alert('Error', 'Signup failed. Please try again.');
+
+      // 2. Save activities using the NEW user ID from 'data.user.id'
+      if (selectedActivities && selectedActivities.length > 0) {
+        
+        // Capture the ID from the response
+        const newUserId = data.user.id;
+
+        for (const item of selectedActivities) {
+          try {
+            // Pass newUserId as the 4th argument
+            await updateSkillLevel(
+              item.activityId, 
+              item.skillLevel, 
+              item.readyToday, 
+              newUserId 
+            );
+          } catch (err) {
+            console.error('Failed to save activity', item, err);
+          }
+        }
+      }
+
+      // 3. Refresh and Navigate
+      await refetch();
+      router.replace('/(tabs)');
+      
+    } catch (err) {
+      console.error('Error during finishSignup:', err);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
       setLoading(false);
     }
   };
@@ -133,12 +167,12 @@ export default function SignupScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleSignup}
-            disabled={loading}
+            style={[styles.button, (loading || signupStarted) && styles.buttonDisabled]}
+            onPress={handleSignupPress}
+            disabled={loading || signupStarted}
           >
             <Text style={styles.buttonText}>
-              {loading ? 'Creating Account...' : 'Create Account'}
+              {loading ? 'Processing...' : 'Create Account'}
             </Text>
           </TouchableOpacity>
 
@@ -154,19 +188,19 @@ export default function SignupScreen() {
       </ScrollView>
 
       <ActivitySelectionModal
-        visible={showActivityModal && signupComplete}
+        visible={showActivityModal}
+        // User closed/skipped the modal
         onClose={() => {
-          // After selecting at least one activity, navigate to main app
-          if (signupComplete) {
-            refetch();
-            router.replace('/(tabs)');
-          }
+          setShowActivityModal(false);
+          // create account immediately with no activities selected
+          finishSignup([]);
         }}
-        onSuccess={() => {
-          refetch();
-          // Navigate to main app after selecting first activity
-          router.replace('/(tabs)');
+        // User selected an activity — modal returns selection
+        onComplete={(selectedActivities) => {
+          setShowActivityModal(false);
+          finishSignup(selectedActivities);
         }}
+        isSignup={true}
       />
     </KeyboardAvoidingView>
   );

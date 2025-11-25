@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // Add error handling for missing environment variables
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL
@@ -11,8 +12,10 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
+    storage: AsyncStorage, // saves the user to the phone's disk
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: false,
   },
   global: {
     headers: {

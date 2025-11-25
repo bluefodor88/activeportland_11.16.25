@@ -2,10 +2,10 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useActivityContext } from '@/contexts/ActivityContext';
+import { useActivityStore } from '@/store/useActivityStore';
 
 export function ActivityHeader() {
-  const { activity, emoji } = useActivityContext();
+  const { activity, emoji } = useActivityStore();
 
   const handleChangeActivity = () => {
     router.push('/(tabs)');
