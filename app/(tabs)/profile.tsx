@@ -25,6 +25,7 @@ import { ICONS } from '@/lib/helperUtils';
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
   const { profile, userSkills, loading, uploading, updateSkillLevel, updateReadyToday, uploadProfileImage, refetch } = useProfile();
+  console.log("🚀 ~ ProfileScreen ~ profile:", profile);
   const { activities } = useActivities();
   const [showActivityModal, setShowActivityModal] = useState(false);
 

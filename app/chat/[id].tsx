@@ -12,6 +12,7 @@ import {
   ScrollView,
   Alert,
   Linking,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -25,6 +26,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ParticipantSelector } from '@/components/ParticipantSelector';
 import { useChatContacts } from '@/hooks/useChatContacts';
 import { useEventParticipants } from '@/hooks/useEventParticipants';
+import * as ImagePicker from 'expo-image-picker'
 
 interface Participant {
   id: string
@@ -48,11 +50,27 @@ export default function ChatScreen() {
   const [acceptedMeetings, setAcceptedMeetings] = useState<any[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedParticipants, setSelectedParticipants] = useState<Participant[]>([]);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
   
   const { user } = useAuth();
   const { messages, loading: messagesLoading, error: messagesError, sendMessage } = useChatMessages(chatId);
   const { inviteParticipants } = useEventParticipants();
   const flatListRef = useRef<FlatList>(null);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 4,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      // result.assets contains the array of selected images
+      const uris = result.assets.map(asset => asset.uri);
+      setSelectedImages(prev => [...prev, ...uris]);
+    }
+  };
 
   // Generate available dates (next 3 weeks)
   const generateAvailableDates = () => {
@@ -234,10 +252,15 @@ export default function ChatScreen() {
       return;
     }
 
+    if ((!newMessage.trim() && !selectedImages) || !chatId || !user) {
+      return;
+    }
+
     try {
-      const success = await sendMessage(newMessage);
+      const success = await sendMessage(newMessage, selectedImages);
       if (success) {
         setNewMessage('');
+        setSelectedImages([]);
         // Scroll to bottom after sending message
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
@@ -376,14 +399,50 @@ export default function ChatScreen() {
     });
   };
 
+  // const renderMessage = ({ item }: { item: any }) => {
+  //   const isMe = item.sender_id === user?.id;
+    
+  //   return (
+  //     <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
+  //       <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+  //         {renderMessageText(item.message, isMe)}
+  //       </Text>
+  //       <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
+  //         {formatTime(item.created_at)}
+  //       </Text>
+  //     </View>
+  //   );
+  // };
+
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = item.sender_id === user?.id;
+    const hasImages = item.image_urls && item.image_urls.length > 0;
     
     return (
       <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
-        <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-          {renderMessageText(item.message, isMe)}
-        </Text>
+        {/* Render Image Gallery */}
+        {hasImages && (
+          <View style={styles.imageGrid}>
+            {item.image_urls.map((url: string, index: number) => (
+              <Image 
+                key={index}
+                source={{ uri: url }} 
+                style={[
+                  styles.messageImage, 
+                  item.image_urls.length > 1 ? styles.gridImage : styles.singleImage
+                ]} 
+                resizeMode="cover"
+              />
+            ))}
+          </View>
+        )}
+        
+        {item.message ? (
+          <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+             {renderMessageText(item.message, isMe)}
+          </Text>
+        ) : null}
+        
         <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
           {formatTime(item.created_at)}
         </Text>
@@ -638,24 +697,45 @@ export default function ChatScreen() {
           </View>
         )}
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={newMessage}
-            onChangeText={setNewMessage}
-            placeholder="Type a message..."
-            placeholderTextColor="#999"
-            maxLength={1000}
-            multiline
-          />
-          <TouchableOpacity 
-            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} 
-            onPress={handleSendMessage}
-            disabled={!newMessage.trim()}
-          >
-                <Ionicons name="send" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
+        
+          <View style={styles.inputWrapper}>
+            {selectedImages?.length > 0 && (
+              <ScrollView horizontal contentContainerStyle={styles.previewContainer} showsHorizontalScrollIndicator={false}>
+                {selectedImages?.map((uri, index) => (
+                  <View key={index} style={styles.previewItem}>
+                    <Image source={{ uri }} style={styles.previewImage} />
+                    <TouchableOpacity 
+                      style={styles.removeImageButton} 
+                      onPress={() => setSelectedImages(imgs => imgs.filter((_, i) => i !== index))}
+                    >
+                      <Ionicons name="close-circle" size={20} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <View style={styles.inputContainer}>
+              <TouchableOpacity style={[styles.sendButton, {marginRight: 10}]} onPress={pickImage}>
+                <Ionicons name="add-circle" size={28} color="white" />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.textInput}
+                value={newMessage}
+                onChangeText={setNewMessage}
+                placeholder="Type a message..."
+                placeholderTextColor="#999"
+                maxLength={1000}
+                multiline
+              />
+              <TouchableOpacity 
+                style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} 
+                onPress={handleSendMessage}
+                disabled={!newMessage.trim()}
+              >
+                    <Ionicons name="send" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+          </View>
       </KeyboardAvoidingView>
 
       <Modal
@@ -1142,5 +1222,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
     color: '#333',
+  },
+  inputWrapper: {
+    backgroundColor: 'white',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 0, // specialized padding
+  },
+  previewContainer: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  attachButton: {
+    marginRight: 10,
+    justifyContent: 'center',
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 8,
+  },
+  messageImage: {
+    borderRadius: 8,
+    backgroundColor: '#e1e4e8',
+    marginBottom: 4,
+  },
+  singleImage: {
+    width: 200,
+    height: 200,
+    resizeMode: 'cover',
+  },
+  gridImage: {
+    width: 100, 
+    height: 100,
+    resizeMode: 'cover',
+  },
+  previewItem: {
+    marginRight: 10,
+    position: 'relative',
+  },
+  previewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
   },
 });
