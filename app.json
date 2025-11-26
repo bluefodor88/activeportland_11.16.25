@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/images/icon.png",
     "platforms": [
       "ios",
       "android",
@@ -32,6 +33,7 @@
       }
     },
     "android": {
+      "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",

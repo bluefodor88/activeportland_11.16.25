@@ -1,5 +1,5 @@
 export const ICONS = {
-    profileIcon: require("@/assets/images/profileIcon.png"),
+    profileIcon: require("@/assets/icons/profileIcon.png"),
 }
 
 export const IMAGES = {}
