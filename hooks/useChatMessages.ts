@@ -62,7 +62,7 @@ export function useChatMessages(chatId: string | null) {
   const fetchMessages = async () => {
     if (!chatId) return
 
-    setLoading(true)
+    // setLoading(true)
     setError(null)
     try {
       const { data, error } = await supabase

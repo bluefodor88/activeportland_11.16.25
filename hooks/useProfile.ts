@@ -65,6 +65,8 @@ export function useProfile() {
     } catch (error) {
       console.error('Error fetching user skills:', error)
       setUserSkills([]) // Set empty array on error to prevent crashes
+    } finally {
+      setLoading(false)
     }
   }, [user])
 

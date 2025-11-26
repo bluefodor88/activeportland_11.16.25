@@ -6,13 +6,14 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Modal,
   ScrollView,
   Alert,
+  Linking,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -53,40 +54,6 @@ export default function ChatScreen() {
   const { inviteParticipants } = useEventParticipants();
   const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    initializeChat();
-    if (chatId) {
-      fetchPendingInvites();
-    }
-  }, [id, user]);
-
-  useEffect(() => {
-    if (chatId) {
-      fetchPendingInvites();
-      fetchAcceptedMeetings();
-    }
-  }, [chatId]);
-
-  // Update current time every minute for countdown timers
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000); // Update every minute
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Auto-scroll to bottom when messages change (debounced to prevent excessive calls)
-  useEffect(() => {
-    if (combinedData && combinedData.length > 0 && flatListRef.current) {
-      const timeoutId = setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [combinedData?.length || 0]);
-
   // Generate available dates (next 3 weeks)
   const generateAvailableDates = () => {
     const dates = [];
@@ -108,7 +75,7 @@ export default function ChatScreen() {
 
   // Combine all data for FlatList (memoized to prevent memory leaks)
   const combinedData = useMemo(() => {
-    const data = [];
+    const data: any[] = [];
     
     // Add accepted meetings first
     acceptedMeetings.forEach((meeting) => {
@@ -383,13 +350,39 @@ export default function ChatScreen() {
     return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const renderMessageText = (text: string, isMe: boolean) => {
+    // Split text by URLs (starts with http:// or https://)
+    const parts = text.split(/(https?:\/\/[^\s]+)/g);
+
+    return parts.map((part, index) => {
+      // If this part is a URL
+      if (/(https?:\/\/[^\s]+)/g.test(part)) {
+        return (
+          <Text
+            key={index}
+            style={{
+              textDecorationLine: 'underline',
+              color: isMe ? 'white' : '#0000EE',
+              fontWeight: 'bold'
+            }}
+            onPress={() => Linking.openURL(part)}
+          >
+            {part}
+          </Text>
+        );
+      }
+      // Normal text
+      return <Text key={index}>{part}</Text>;
+    });
+  };
+
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = item.sender_id === user?.id;
     
     return (
       <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
         <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-          {item.message}
+          {renderMessageText(item.message, isMe)}
         </Text>
         <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
           {formatTime(item.created_at)}
@@ -514,9 +507,43 @@ export default function ChatScreen() {
     );
   };
 
+  useEffect(() => {
+    initializeChat();
+    if (chatId) {
+      fetchPendingInvites();
+    }
+  }, [id, user]);
+
+  useEffect(() => {
+    if (chatId) {
+      fetchPendingInvites();
+      fetchAcceptedMeetings();
+    }
+  }, [chatId]);
+
+  // Update current time every minute for countdown timers
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Auto-scroll to bottom when messages change (debounced to prevent excessive calls)
+  useEffect(() => {
+    if (combinedData && combinedData.length > 0 && flatListRef.current) {
+      const timeoutId = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [combinedData?.length || 0]);
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -535,7 +562,7 @@ export default function ChatScreen() {
 
   if (error || !chatId) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -555,7 +582,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
       
       <View style={styles.header}>
@@ -711,7 +738,7 @@ export default function ChatScreen() {
                   selectedParticipants={selectedParticipants}
                   onParticipantsChange={setSelectedParticipants}
                   maxParticipants={7}
-                  excludeUserIds={[user?.id || '', id]} // Exclude self and chat partner
+                  // excludeUserIds={[user?.id || '', id]} // Exclude self and chat partner
                 />
               </View>
             </ScrollView>
