@@ -60,6 +60,7 @@ export function useForumMessages(activityId?: string) {
           reply_to:forum_messages!reply_to_id (
             id,
             message,
+            image_urls,
             profiles!user_id (
               name
             )

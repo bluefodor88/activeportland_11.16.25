@@ -13,6 +13,7 @@ import {
   Pressable,
   Linking,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -39,6 +40,7 @@ export default function ForumScreen() {
   const [newMessage, setNewMessage] = useState('');
   const [replyingTo, setReplyingTo] = useState<any>(null);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [isSending, setIsSending] = useState<boolean>(false);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -57,11 +59,16 @@ export default function ForumScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   const handleSendMessage = async () => {
-    if (newMessage.trim() || selectedImages.length > 0) {
-      if(newMessage.trim().length > 1000){
-        Alert.alert('Message Too Long', 'Please keep messages under 1000 characters');
-        return;
-      }
+    if (!newMessage.trim() && selectedImages.length === 0) return;
+    
+    if (newMessage.trim().length > 1000) {
+      Alert.alert('Message Too Long', 'Please keep messages under 1000 characters');
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
       const success = await sendMessage(newMessage, replyingTo?.id, selectedImages);
       if (success) {
         setNewMessage('');
@@ -70,6 +77,11 @@ export default function ForumScreen() {
       } else {
         Alert.alert('Error', 'Failed to send message.');
       }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -150,7 +162,7 @@ export default function ForumScreen() {
     const userName = isMe ? 'You' : item.profiles?.name || 'Unknown';
     const avatarUrl = item.profiles?.avatar_url ?? null;
     const hasImages = item.image_urls && item.image_urls.length > 0;
-    
+
     // Get the user's skill level for this activity
     const getUserSkillLevel = () => {
       if (isMe) return skillLevel;
@@ -296,9 +308,13 @@ export default function ForumScreen() {
                     <Ionicons name="close" size={16} color="#666" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.replyPreviewMessage} numberOfLines={2}>
-                  {replyingTo.message}
-                </Text>
+                {
+                  replyingTo.message ? (
+                    <Text style={styles.replyPreviewMessage} numberOfLines={2}>
+                      {replyingTo.message}
+                    </Text>
+                  ) : null
+                }
               </View>
             )}
 
@@ -319,7 +335,10 @@ export default function ForumScreen() {
                 </ScrollView>
               )}
               <View style={styles.inputContainer}>
-                <TouchableOpacity style={[styles.sendButton, {marginRight: 10}]} onPress={pickImage}>
+                <TouchableOpacity 
+                  style={[styles.sendButton, {marginRight: 10}, isSending && {opacity: 0.5}]} 
+                  onPress={pickImage} 
+                  disabled={isSending}>
                   <Ionicons name="add-circle" size={28} color="white" />
                 </TouchableOpacity>
                 <TextInput
@@ -330,9 +349,21 @@ export default function ForumScreen() {
                   placeholderTextColor="#999"
                   maxLength={1000}
                   multiline
+                  editable={!isSending}
                 />
-                <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
+                <TouchableOpacity 
+                  style={[
+                    styles.sendButton, 
+                    (isSending || (!newMessage.trim() && selectedImages.length === 0)) && { opacity: 0.7 }
+                  ]} 
+                  onPress={handleSendMessage}
+                  disabled={isSending || (!newMessage.trim() && selectedImages.length === 0)}
+                >
+                  {isSending ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
                     <Ionicons name="send" size={20} color="white" />
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -618,7 +649,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 4,
-    marginVertical: 4,
+    marginTop: 4,
   },
   messageImage: {
     borderRadius: 8,
