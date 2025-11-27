@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 import type { ForumMessage } from '@/types/database'
+import { Alert } from 'react-native';
 
 export function useForumMessages(activityId?: string) {
   const { user } = useAuth()
@@ -10,9 +11,10 @@ export function useForumMessages(activityId?: string) {
 
   useEffect(() => {
     if (activityId) {
-      fetchMessages()
+      // 1. Load initial messages
+      fetchMessages(true) 
       
-      // Set up real-time subscription for new messages
+      // 2. Set up real-time listener
       const subscription = supabase
         .channel(`forum_messages_${activityId}`)
         .on('postgres_changes', 
@@ -22,26 +24,24 @@ export function useForumMessages(activityId?: string) {
             table: 'forum_messages',
             filter: `activity_id=eq.${activityId}`
           }, 
-          () => {
-            fetchMessages() // Refresh messages when new ones are added
+          (payload) => {
+            // When a new message arrives, fetch silently (no spinner)
+            fetchMessages(false)
           }
         )
         .subscribe()
 
       return () => {
-        try {
-          subscription.unsubscribe()
-        } catch (error) {
-          console.error('Error unsubscribing from forum messages:', error)
-        }
+        supabase.removeChannel(subscription)
       }
     }
   }, [activityId])
 
-  const fetchMessages = async () => {
+  const fetchMessages = async (showLoading = false) => {
     if (!activityId) return
 
-    setLoading(true)
+    if (showLoading) setLoading(true)
+      
     try {
       const { data, error } = await supabase
         .from('forum_messages')
@@ -74,36 +74,27 @@ export function useForumMessages(activityId?: string) {
 
       if (error) {
         console.error('Error fetching forum messages:', error)
-        setMessages([])
       } else {
         setMessages(data || [])
       }
     } catch (error) {
       console.error('Error fetching forum messages:', error)
-      setMessages([])
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
   const sendMessage = async (message: string, replyToId?: string) => {
-    if (!activityId || !message.trim()) {
-      console.error('Cannot send message: missing activity ID or empty message')
-      return false
-    }
-
+    if (!activityId || !message.trim()) return false
     // Validate message length
     if (message.trim().length > 1000) {
-      console.error('Message too long')
+      Alert.alert('Message too long')
       return false
     }
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        console.error('User not authenticated')
-        return false
-      }
+      if (!user) return false
 
       const { error } = await supabase
         .from('forum_messages')
@@ -118,7 +109,8 @@ export function useForumMessages(activityId?: string) {
         console.error('Error sending message:', error)
         return false
       } else {
-        fetchMessages() // Refresh messages
+        // Refresh immediately without spinner
+        fetchMessages(false) 
         return true
       }
     } catch (error) {
@@ -127,5 +119,5 @@ export function useForumMessages(activityId?: string) {
     }
   }
 
-  return { messages, loading, sendMessage, refetch: fetchMessages }
+  return { messages, loading, sendMessage, refetch: () => fetchMessages(false) }
 }

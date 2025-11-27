@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,8 @@ export default function ForumScreen() {
   const { user } = useAuth();
   const [newMessage, setNewMessage] = useState('');
   const [replyingTo, setReplyingTo] = useState<any>(null);
+
+  const flatListRef = useRef<FlatList>(null);
 
   const handleSendMessage = async () => {
     if (newMessage.trim()) {
@@ -94,6 +96,20 @@ export default function ForumScreen() {
     }
   };
 
+  const scrollToMessage = (messageId: string) => {
+    const index = messages.findIndex(msg => msg.id === messageId);
+  
+    if (index !== -1 && flatListRef.current) {
+      flatListRef.current.scrollToIndex({ 
+        index, 
+        animated: true,
+        viewPosition: 0.5 // 0.5 centers the message in the middle of the screen
+      });
+    } else {
+      Alert.alert("Message not found", "The message you are looking for might be too old or deleted.");
+    }
+  };
+
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = item.profiles?.name?.toLowerCase() === profile?.name?.toLowerCase();
     const userName = isMe ? 'You' : item.profiles?.name || 'Unknown';
@@ -120,7 +136,7 @@ export default function ForumScreen() {
       delayLongPress={500}
     >
       {replyToMessage && (
-        <TouchableOpacity style={styles.replyContainer} onPress={()=>console.log(item.reply_to_id)}>
+        <TouchableOpacity style={styles.replyContainer} onPress={()=>scrollToMessage(item.reply_to_id)}>
           <Ionicons name="arrow-undo" size={14} color="#666" />
           <Text style={styles.replyText}>
             Replying to {replyToMessage.profiles?.name || 'Unknown'}: {replyToMessage.message.substring(0, 50)}...
@@ -180,12 +196,16 @@ export default function ForumScreen() {
 
         {activityId ? (
           <FlatList
+            ref={flatListRef}
             inverted
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
             style={styles.messagesList}
             contentContainerStyle={styles.messagesContainer}
+            onScrollToIndexFailed={(info)=>{
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+            }}
           />
         ) : (
           <View style={styles.emptyState}>
