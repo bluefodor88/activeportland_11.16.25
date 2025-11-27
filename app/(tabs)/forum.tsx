@@ -11,6 +11,8 @@ import {
   Image,
   Alert,
   Pressable,
+  Linking,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -25,6 +27,7 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useActivityStore } from '@/store/useActivityStore';
 import { ICONS } from '@/lib/helperUtils';
 import RepliedToMessage from '@/components/RepliedToMessage';
+import * as ImagePicker from 'expo-image-picker';
 
 
 export default function ForumScreen() {
@@ -35,22 +38,37 @@ export default function ForumScreen() {
   const { user } = useAuth();
   const [newMessage, setNewMessage] = useState('');
   const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 4,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const uris = result.assets.map(asset => asset.uri);
+      setSelectedImages(prev => [...prev, ...uris]);
+    }
+  };
 
   const flatListRef = useRef<FlatList>(null);
 
   const handleSendMessage = async () => {
-    if (newMessage.trim()) {
-      if (newMessage.trim().length > 1000) {
+    if (newMessage.trim() || selectedImages.length > 0) {
+      if(newMessage.trim().length > 1000){
         Alert.alert('Message Too Long', 'Please keep messages under 1000 characters');
         return;
       }
-      
-      const success = await sendMessage(newMessage, replyingTo?.id);
+      const success = await sendMessage(newMessage, replyingTo?.id, selectedImages);
       if (success) {
         setNewMessage('');
         setReplyingTo(null);
+        setSelectedImages([]);
       } else {
-        Alert.alert('Error', 'Failed to send message. Please try again.');
+        Alert.alert('Error', 'Failed to send message.');
       }
     }
   };
@@ -63,9 +81,6 @@ export default function ForumScreen() {
 
   const cancelReply = () => {
     setReplyingTo(null);
-  };
-  const formatTime = (date: Date) => {
-    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const openUserChat = async (message: any) => {
@@ -111,10 +126,30 @@ export default function ForumScreen() {
     }
   };
 
+  const renderMessageText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/(https?:\/\/[^\s]+)/g);
+    return parts.map((part, index) => {
+      if (/(https?:\/\/[^\s]+)/g.test(part)) {
+        return (
+          <Text
+            key={index}
+            style={{ textDecorationLine: 'underline', color: '#0000EE' }}
+            onPress={() => Linking.openURL(part)}
+          >
+            {part}
+          </Text>
+        );
+      }
+      return <Text key={index}>{part}</Text>;
+    });
+  };
+
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = item.profiles?.name?.toLowerCase() === profile?.name?.toLowerCase();
     const userName = isMe ? 'You' : item.profiles?.name || 'Unknown';
     const avatarUrl = item.profiles?.avatar_url ?? null;
+    const hasImages = item.image_urls && item.image_urls.length > 0;
     
     // Get the user's skill level for this activity
     const getUserSkillLevel = () => {
@@ -137,21 +172,51 @@ export default function ForumScreen() {
       delayLongPress={500}
     >
       <View style={styles.messageContent}>
-        <Image source={ avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon} style={styles.messageAvatar} />
-        <View style={{flex: 1}}>
-          <View style={styles.messageHeader}>
-            <TouchableOpacity onPress={() => openUserChat(item)}>
-              <Text style={[styles.userName, !isMe && styles.clickableUserName]}>
-                {userName}
-              </Text>
-            </TouchableOpacity>
-            <View style={[styles.skillBadge, { backgroundColor: getSkillColor(userSkillLevel) }]}>
-              <Text style={styles.skillText}>{userSkillLevel}</Text>
+          <Image
+            source={avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon}
+            style={styles.messageAvatar}
+          />
+          <View style={{ flex: 1 }}>
+            <View style={styles.messageHeader}>
+              <TouchableOpacity onPress={() => openUserChat(item)}>
+                <Text
+                  style={[styles.userName, !isMe && styles.clickableUserName]}
+                >
+                  {userName}
+                </Text>
+              </TouchableOpacity>
+              <View
+                style={[
+                  styles.skillBadge,
+                  { backgroundColor: getSkillColor(userSkillLevel) },
+                ]}
+              >
+                <Text style={styles.skillText}>{userSkillLevel}</Text>
+              </View>
             </View>
+            {item.message ? (
+              <Text style={styles.messageText}>
+                {renderMessageText(item.message)}
+              </Text>
+            ) : null}
+            {hasImages && (
+              <View style={styles.imageGrid}>
+                {item.image_urls.map((url: string, index: number) => (
+                  <Image
+                    key={index}
+                    source={{ uri: url }}
+                    style={[
+                      styles.messageImage,
+                      item.image_urls.length > 1
+                        ? styles.gridImage
+                        : styles.singleImage,
+                    ]}
+                  />
+                ))}
+              </View>
+            )}
           </View>
-          <Text style={styles.messageText}>{item.message}</Text>
         </View>
-      </View>
 
       {replyToMessage && (
           <RepliedToMessage
@@ -236,20 +301,41 @@ export default function ForumScreen() {
                 </Text>
               </View>
             )}
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              value={newMessage}
-              onChangeText={setNewMessage}
-              placeholder={replyingTo ? `Reply to ${replyingTo.profiles?.name || 'Unknown'}...` : "Type your message..."}
-              placeholderTextColor="#999"
-              maxLength={1000}
-              multiline
-            />
-            <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-                <Ionicons name="send" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
+
+            <View style={styles.inputWrapper}>
+              {selectedImages.length > 0 && (
+                <ScrollView horizontal contentContainerStyle={styles.previewContainer} showsHorizontalScrollIndicator={false}>
+                  {selectedImages.map((uri, index) => (
+                    <View key={index} style={styles.previewItem}>
+                      <Image source={{ uri }} style={styles.previewImage} />
+                      <TouchableOpacity 
+                        style={styles.removeImageButton} 
+                        onPress={() => setSelectedImages(imgs => imgs.filter((_, i) => i !== index))}
+                      >
+                        <Ionicons name="close-circle" size={20} color="white" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+              <View style={styles.inputContainer}>
+                <TouchableOpacity style={[styles.sendButton, {marginRight: 10}]} onPress={pickImage}>
+                  <Ionicons name="add-circle" size={28} color="white" />
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.textInput}
+                  value={newMessage}
+                  onChangeText={setNewMessage}
+                  placeholder={replyingTo ? `Reply to ${replyingTo.profiles?.name || 'Unknown'}...` : "Type your message..."}
+                  placeholderTextColor="#999"
+                  maxLength={1000}
+                  multiline
+                />
+                <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
+                    <Ionicons name="send" size={20} color="white" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </>
         )}
       </KeyboardAvoidingView>
@@ -498,5 +584,54 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     color: '#666',
     fontStyle: 'italic',
+  },
+  attachButton: {
+    marginRight: 10,
+    justifyContent: 'center',
+  },
+  inputWrapper: {
+    backgroundColor: 'white',
+  },
+  previewContainer: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewItem: {
+    marginRight: 10,
+  },
+  previewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginVertical: 4,
+  },
+  messageImage: {
+    borderRadius: 8,
+    backgroundColor: '#eee',
+  },
+  singleImage: {
+    width: 200,
+    height: 200,
+    resizeMode: 'cover',
+  },
+  gridImage: {
+    width: 80,
+    height: 80,
+    resizeMode: 'cover',
   },
 });

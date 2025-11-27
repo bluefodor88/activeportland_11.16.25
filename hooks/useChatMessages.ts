@@ -139,57 +139,6 @@ export function useChatMessages(chatId: string | null) {
     }
   }
 
-  // const sendMessage = async (message: string): Promise<boolean> => {
-  //   if (!chatId || !user || !message.trim()) {
-  //     console.error('Cannot send message: missing required data')
-  //     setError('Cannot send message - missing required data')
-  //     return false
-  //   }
-
-  //   // Validate message length
-  //   if (message.trim().length > 1000) {
-  //     console.error('Message too long')
-  //     setError('Message too long - please keep under 1000 characters')
-  //     return false
-  //   }
-
-  //   try {
-  //     const { error } = await supabase
-  //       .from('chat_messages')
-  //       .insert({
-  //         chat_id: chatId,
-  //         sender_id: user.id,
-  //         message: message.trim()
-  //       })
-
-  //     if (error) {
-  //       console.error('Error sending message:', error)
-  //       setError('Failed to send message')
-  //       return false
-  //     }
-
-  //     // Update chat's last_message_at
-  //     try {
-  //       await supabase
-  //         .from('chats')
-  //         .update({ last_message_at: new Date().toISOString() })
-  //         .eq('id', chatId)
-  //     } catch (updateError) {
-  //       console.warn('Failed to update chat timestamp:', updateError)
-  //       // Don't fail the entire operation for this
-  //     }
-
-  //     // Immediately fetch messages to update the UI
-  //     fetchMessages()
-  //     setError(null)
-  //     return true
-  //   } catch (error) {
-  //     console.error('Error sending message:', error)
-  //     setError('Network error - please check your connection')
-  //     return false
-  //   }
-  // }
-
   const sendMessage = async (message: string, imageUris: string[] = []): Promise<boolean> => {
     if (!chatId || !user || (!message.trim() && imageUris.length === 0)) {
       return false

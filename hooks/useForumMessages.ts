@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 import type { ForumMessage } from '@/types/database'
 import { Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker'
 
 export function useForumMessages(activityId?: string) {
   const { user } = useAuth()
@@ -24,10 +25,7 @@ export function useForumMessages(activityId?: string) {
             table: 'forum_messages',
             filter: `activity_id=eq.${activityId}`
           }, 
-          (payload) => {
-            // When a new message arrives, fetch silently (no spinner)
-            fetchMessages(false)
-          }
+          () => fetchMessages(false)
         )
         .subscribe()
 
@@ -36,6 +34,18 @@ export function useForumMessages(activityId?: string) {
       }
     }
   }, [activityId])
+
+  const requestPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need photo gallery permissions to send photo.'
+      );
+      return false;
+    }
+    return true;
+  };
 
   const fetchMessages = async (showLoading = false) => {
     if (!activityId) return
@@ -72,47 +82,70 @@ export function useForumMessages(activityId?: string) {
         .eq('profiles.user_activity_skills.activity_id', activityId)
         .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error('Error fetching forum messages:', error)
-      } else {
-        setMessages(data || [])
-      }
+      if (error) throw error
+      setMessages(data || [])
     } catch (error) {
-      console.error('Error fetching forum messages:', error)
+      console.error('Error fetching messages:', error)
     } finally {
       if (showLoading) setLoading(false)
     }
   }
 
-  const sendMessage = async (message: string, replyToId?: string) => {
-    if (!activityId || !message.trim()) return false
-    // Validate message length
+  // Helper: Upload Image
+  const uploadImage = async (uri: string) => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+    
+    try {
+      const response = await fetch(uri)
+      const arrayBuffer = await response.arrayBuffer()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`
+      
+      const { error } = await supabase.storage
+        .from('chat-images') // Reusing your existing bucket
+        .upload(fileName, arrayBuffer, { contentType: 'image/png' })
+
+      if (error) throw error
+      
+      const { data } = supabase.storage.from('chat-images').getPublicUrl(fileName)
+      return data.publicUrl
+    } catch (error) {
+      console.error('Upload failed:', error)
+      return null
+    }
+  }
+
+  // Updated sendMessage to accept images
+  const sendMessage = async (message: string, replyToId?: string, imageUris: string[] = []) => {
+    if (!activityId || !user) return false
+    if (!message.trim() && imageUris.length === 0) return false
+
     if (message.trim().length > 1000) {
       Alert.alert('Message too long')
       return false
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return false
+      // 1. Upload Images
+      const uploadPromises = imageUris.map(uri => uploadImage(uri))
+      const uploadedUrls = await Promise.all(uploadPromises)
+      const validUrls = uploadedUrls.filter(url => url !== null) as string[]
 
+      // 2. Insert Message
       const { error } = await supabase
         .from('forum_messages')
         .insert({
           activity_id: activityId,
           user_id: user.id,
           message: message.trim(),
-          reply_to_id: replyToId || null
+          reply_to_id: replyToId || null,
+          image_urls: validUrls
         })
 
-      if (error) {
-        console.error('Error sending message:', error)
-        return false
-      } else {
-        // Refresh immediately without spinner
-        fetchMessages(false) 
-        return true
-      }
+      if (error) throw error
+
+      fetchMessages(false) 
+      return true
     } catch (error) {
       console.error('Error sending message:', error)
       return false
