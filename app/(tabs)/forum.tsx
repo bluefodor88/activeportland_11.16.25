@@ -115,31 +115,33 @@ export default function ForumScreen() {
     
     return (
     <Pressable 
-      style={styles.messageContainer}
+      style={[styles.messageContainer, {gap: 12}]}
       onLongPress={() => handleLongPress(item)}
       delayLongPress={500}
     >
       {replyToMessage && (
-        <View style={styles.replyContainer}>
-                <Ionicons name="arrow-undo" size={14} color="#666" />
+        <TouchableOpacity style={styles.replyContainer} onPress={()=>console.log(item.reply_to_id)}>
+          <Ionicons name="arrow-undo" size={14} color="#666" />
           <Text style={styles.replyText}>
             Replying to {replyToMessage.profiles?.name || 'Unknown'}: {replyToMessage.message.substring(0, 50)}...
           </Text>
-        </View>
-      )}
-      <Image source={ avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon} style={styles.messageAvatar} />
-      <View style={styles.messageContent}>
-      <View style={styles.messageHeader}>
-        <TouchableOpacity onPress={() => openUserChat(item)}>
-          <Text style={[styles.userName, !isMe && styles.clickableUserName]}>
-            {userName}
-          </Text>
         </TouchableOpacity>
-        <View style={[styles.skillBadge, { backgroundColor: getSkillColor(userSkillLevel) }]}>
-          <Text style={styles.skillText}>{userSkillLevel}</Text>
+      )}
+      <View style={styles.messageContent}>
+        <Image source={ avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon} style={styles.messageAvatar} />
+        <View style={{flex: 1}}>
+          <View style={[styles.messageHeader, {gap: 8}]}>
+            <TouchableOpacity onPress={() => openUserChat(item)}>
+              <Text style={[styles.userName, !isMe && styles.clickableUserName]}>
+                {userName}
+              </Text>
+            </TouchableOpacity>
+            <View style={[styles.skillBadge, { backgroundColor: getSkillColor(userSkillLevel) }]}>
+              <Text style={styles.skillText}>{userSkillLevel}</Text>
+            </View>
+          </View>
+          <Text style={styles.messageText}>{item.message}</Text>
         </View>
-      </View>
-      <Text style={styles.messageText}>{item.message}</Text>
       </View>
     </Pressable>
   );};
@@ -312,7 +314,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   messageContainer: {
-    flexDirection: 'row',
     backgroundColor: 'white',
     padding: 16,
     borderRadius: 12,
@@ -333,10 +334,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 12,
   },
   messageContent: {
     flex: 1,
+    flexDirection: 'row',
+    gap: 12
   },
   messageHeader: {
     flexDirection: 'row',
@@ -357,7 +359,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
-    marginRight: 8,
   },
   skillText: {
     fontSize: 10,
@@ -374,7 +375,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
     color: '#333',
-    lineHeight: 20,
   },
   inputContainer: {
     flexDirection: 'row',
