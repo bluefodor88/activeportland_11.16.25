@@ -24,6 +24,7 @@ import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { useActivityStore } from '@/store/useActivityStore';
 import { ICONS } from '@/lib/helperUtils';
+import RepliedToMessage from '@/components/RepliedToMessage';
 
 
 export default function ForumScreen() {
@@ -135,18 +136,10 @@ export default function ForumScreen() {
       onLongPress={() => handleLongPress(item)}
       delayLongPress={500}
     >
-      {replyToMessage && (
-        <TouchableOpacity style={styles.replyContainer} onPress={()=>scrollToMessage(item.reply_to_id)}>
-          <Ionicons name="arrow-undo" size={14} color="#666" />
-          <Text style={styles.replyText}>
-            Replying to {replyToMessage.profiles?.name || 'Unknown'}: {replyToMessage.message.substring(0, 50)}...
-          </Text>
-        </TouchableOpacity>
-      )}
       <View style={styles.messageContent}>
         <Image source={ avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon} style={styles.messageAvatar} />
         <View style={{flex: 1}}>
-          <View style={[styles.messageHeader, {gap: 8}]}>
+          <View style={styles.messageHeader}>
             <TouchableOpacity onPress={() => openUserChat(item)}>
               <Text style={[styles.userName, !isMe && styles.clickableUserName]}>
                 {userName}
@@ -159,6 +152,15 @@ export default function ForumScreen() {
           <Text style={styles.messageText}>{item.message}</Text>
         </View>
       </View>
+
+      {replyToMessage && (
+          <RepliedToMessage
+            replyToId={item.reply_to_id}
+            replyToMessage={replyToMessage}
+            messageItem={item}
+            scrollToMessage={scrollToMessage}
+          />
+        )}
     </Pressable>
   );};
 
