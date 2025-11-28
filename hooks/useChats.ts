@@ -50,7 +50,7 @@ export function useChats() {
 
           const { data: lastMessageData } = await supabase
             .from('chat_messages')
-            .select('message, created_at')
+            .select('message, created_at, image_urls')
             .eq('chat_id', chat.id)
             .order('created_at', { ascending: false })
             .limit(1)
@@ -69,7 +69,7 @@ export function useChats() {
           return {
             id: chat.id,
             name: profileData?.name || 'Unknown User',
-            lastMessage: lastMessageData?.message || 'No messages yet',
+            lastMessage: lastMessageData?.image_urls?.length ? "📷 Photo" : lastMessageData?.message ?? "No messages yet",
             timestamp: new Date(lastMessageData?.created_at || chat.created_at),
             unreadCount: unreadCount || 0,
             avatar: profileData?.avatar_url ?? null,

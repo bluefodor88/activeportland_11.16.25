@@ -13,6 +13,7 @@ import {
   Alert,
   Linking,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -24,7 +25,6 @@ import { getOrCreateChat } from '@/hooks/useChats';
 import { supabase } from '@/lib/supabase';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ParticipantSelector } from '@/components/ParticipantSelector';
-import { useChatContacts } from '@/hooks/useChatContacts';
 import { useEventParticipants } from '@/hooks/useEventParticipants';
 import * as ImagePicker from 'expo-image-picker'
 
@@ -42,7 +42,6 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [eventTitle, setEventTitle] = useState('');
   const [eventLocation, setEventLocation] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -51,6 +50,7 @@ export default function ChatScreen() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedParticipants, setSelectedParticipants] = useState<Participant[]>([]);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [isSending, setIsSending] = useState(false);
   
   const { user } = useAuth();
   const { messages, loading: messagesLoading, error: messagesError, sendMessage } = useChatMessages(chatId);
@@ -242,10 +242,12 @@ export default function ChatScreen() {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage?.trim() || !chatId || !user) {
-      Alert.alert('Error', 'Cannot send message - missing required information');
+    // Check if BOTH text and images are empty
+    if ((!newMessage.trim() && selectedImages.length === 0) || !chatId || !user) {
       return;
     }
+
+    if (isSending) return;
 
     if (newMessage.trim().length > 1000) {
       Alert.alert('Message Too Long', 'Please keep messages under 1000 characters');
@@ -257,6 +259,8 @@ export default function ChatScreen() {
     }
 
     try {
+      setIsSending(true);
+
       const success = await sendMessage(newMessage, selectedImages);
       if (success) {
         setNewMessage('');
@@ -271,6 +275,8 @@ export default function ChatScreen() {
     } catch (error) {
       console.error('Error in handleSendMessage:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -398,21 +404,6 @@ export default function ChatScreen() {
       return <Text key={index}>{part}</Text>;
     });
   };
-
-  // const renderMessage = ({ item }: { item: any }) => {
-  //   const isMe = item.sender_id === user?.id;
-    
-  //   return (
-  //     <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
-  //       <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-  //         {renderMessageText(item.message, isMe)}
-  //       </Text>
-  //       <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
-  //         {formatTime(item.created_at)}
-  //       </Text>
-  //     </View>
-  //   );
-  // };
 
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = item.sender_id === user?.id;
@@ -660,7 +651,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView 
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        // keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {messagesLoading ? (
           <View style={styles.centerContainer}>
@@ -727,13 +718,24 @@ export default function ChatScreen() {
                 maxLength={1000}
                 multiline
               />
-              <TouchableOpacity 
-                style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} 
-                onPress={handleSendMessage}
-                disabled={!newMessage.trim()}
-              >
-                    <Ionicons name="send" size={20} color="white" />
-              </TouchableOpacity>
+              <TouchableOpacity
+              style={[
+                styles.sendButton,
+                ((!newMessage.trim() && selectedImages.length === 0) ||
+                  isSending) &&
+                  styles.sendButtonDisabled,
+              ]}
+              onPress={handleSendMessage}
+              disabled={
+                (!newMessage.trim() && selectedImages.length === 0) || isSending
+              }
+            >
+              {isSending ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Ionicons name="send" size={20} color="white" />
+              )}
+            </TouchableOpacity>
             </View>
           </View>
       </KeyboardAvoidingView>
@@ -1225,7 +1227,7 @@ const styles = StyleSheet.create({
   },
   inputWrapper: {
     backgroundColor: 'white',
-    paddingBottom: Platform.OS === 'ios' ? 20 : 0, // specialized padding
+    // paddingBottom: Platform.OS === 'ios' ? 20 : 0, // specialized padding
   },
   previewContainer: {
     padding: 10,
