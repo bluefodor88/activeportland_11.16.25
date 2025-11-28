@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ImageView from "react-native-image-viewing";
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -42,6 +43,10 @@ export default function ForumScreen() {
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [isSending, setIsSending] = useState<boolean>(false);
 
+  const [isGalleryVisible, setIsGalleryVisible] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<{ uri: string }[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
@@ -57,6 +62,13 @@ export default function ForumScreen() {
   };
 
   const flatListRef = useRef<FlatList>(null);
+
+  const openGallery = (imageUrls: string[], index: number) => {
+    const formattedImages = imageUrls.map(url => ({ uri: url }));
+    setGalleryImages(formattedImages);
+    setGalleryIndex(index);
+    setIsGalleryVisible(true);
+  };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() && selectedImages.length === 0) return;
@@ -214,16 +226,21 @@ export default function ForumScreen() {
             {hasImages && (
               <View style={styles.imageGrid}>
                 {item.image_urls.map((url: string, index: number) => (
-                  <Image
+                  <TouchableOpacity 
                     key={index}
-                    source={{ uri: url }}
-                    style={[
-                      styles.messageImage,
-                      item.image_urls.length > 1
-                        ? styles.gridImage
-                        : styles.singleImage,
-                    ]}
-                  />
+                    onPress={() => openGallery(item.image_urls, index)}
+                    activeOpacity={0.9}
+                  >
+                    <Image
+                      source={{ uri: url }}
+                      style={[
+                        styles.messageImage,
+                        item.image_urls.length > 1
+                          ? styles.gridImage
+                          : styles.singleImage,
+                      ]}
+                    />
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -370,6 +387,14 @@ export default function ForumScreen() {
           </>
         )}
       </KeyboardAvoidingView>
+      <ImageView
+        images={galleryImages}
+        imageIndex={galleryIndex}
+        visible={isGalleryVisible}
+        onRequestClose={() => setIsGalleryVisible(false)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+      />
     </SafeAreaView>
   );
 }
