@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import ImageView from "react-native-image-viewing";
 import { useLocalSearchParams, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,6 +52,10 @@ export default function ChatScreen() {
   const [selectedParticipants, setSelectedParticipants] = useState<Participant[]>([]);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
+
+  const [isGalleryVisible, setIsGalleryVisible] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<{ uri: string }[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
   
   const { user } = useAuth();
   const { messages, loading: messagesLoading, error: messagesError, sendMessage } = useChatMessages(chatId);
@@ -70,6 +75,13 @@ export default function ChatScreen() {
       const uris = result.assets.map(asset => asset.uri);
       setSelectedImages(prev => [...prev, ...uris]);
     }
+  };
+
+  const openGallery = (imageUrls: string[], index: number) => {
+    const formattedImages = imageUrls.map(url => ({ uri: url }));
+    setGalleryImages(formattedImages);
+    setGalleryIndex(index);
+    setIsGalleryVisible(true);
   };
 
   // Generate available dates (next 3 weeks)
@@ -415,15 +427,20 @@ export default function ChatScreen() {
         {hasImages && (
           <View style={styles.imageGrid}>
             {item.image_urls.map((url: string, index: number) => (
-              <Image 
+              <TouchableOpacity 
                 key={index}
-                source={{ uri: url }} 
-                style={[
-                  styles.messageImage, 
-                  item.image_urls.length > 1 ? styles.gridImage : styles.singleImage
-                ]} 
-                resizeMode="cover"
-              />
+                onPress={() => openGallery(item.image_urls, index)}
+                activeOpacity={0.9}
+              >
+                <Image 
+                  source={{ uri: url }} 
+                  style={[
+                    styles.messageImage, 
+                    item.image_urls.length > 1 ? styles.gridImage : styles.singleImage
+                  ]} 
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -843,6 +860,14 @@ export default function ChatScreen() {
           </View>
         </View>
       </Modal>
+      <ImageView
+        images={galleryImages}
+        imageIndex={galleryIndex}
+        visible={isGalleryVisible}
+        onRequestClose={() => setIsGalleryVisible(false)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+      />
     </SafeAreaView>
   );
 }
