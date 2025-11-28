@@ -1,35 +1,32 @@
+import { ActivityCarousel } from '@/components/ActivityCarousel';
+import ForumMessageItem from '@/components/ForumMessageItem';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useAuth } from '@/hooks/useAuth';
+import { getOrCreateChat } from '@/hooks/useChats';
+import { useForumMessages } from '@/hooks/useForumMessages';
+import { useProfile } from '@/hooks/useProfile';
+import { useActivityStore } from '@/store/useActivityStore';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useRef, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  Alert,
-  Pressable,
-  Linking,
-  ScrollView,
-  ActivityIndicator,
+  View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import ImageView from "react-native-image-viewing";
-import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useForumMessages } from '@/hooks/useForumMessages';
-import { useProfile } from '@/hooks/useProfile';
-import { getOrCreateChat } from '@/hooks/useChats';
-import { useAuth } from '@/hooks/useAuth';
-import { ActivityCarousel } from '@/components/ActivityCarousel';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { useActivityStore } from '@/store/useActivityStore';
-import { ICONS } from '@/lib/helperUtils';
-import RepliedToMessage from '@/components/RepliedToMessage';
-import * as ImagePicker from 'expo-image-picker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 export default function ForumScreen() {
@@ -46,6 +43,8 @@ export default function ForumScreen() {
   const [isGalleryVisible, setIsGalleryVisible] = useState(false);
   const [galleryImages, setGalleryImages] = useState<{ uri: string }[]>([]);
   const [galleryIndex, setGalleryIndex] = useState(0);
+
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -123,19 +122,6 @@ export default function ForumScreen() {
     }
   };
 
-  const getSkillColor = (skillLevel: string) => {
-    switch (skillLevel) {
-      case 'Beginner':
-        return '#4CAF50';
-      case 'Intermediate':
-        return '#FFBF00';
-      case 'Advanced':
-        return '#FF9800';
-      default:
-        return '#999';
-    }
-  };
-
   const scrollToMessage = (messageId: string) => {
     const index = messages.findIndex(msg => msg.id === messageId);
   
@@ -143,120 +129,36 @@ export default function ForumScreen() {
       flatListRef.current.scrollToIndex({ 
         index, 
         animated: true,
-        viewPosition: 0.5 // 0.5 centers the message in the middle of the screen
+        viewPosition: 0.5 
       });
+
+      // Trigger the Highlight
+      setHighlightedMessageId(messageId);
+      
+      // Clear the ID after animation finishes (approx 2 seconds) so it can be highlighted again later
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 2000);
+
     } else {
       Alert.alert("Message not found", "The message you are looking for might be too old or deleted.");
     }
   };
 
-  const renderMessageText = (text: string) => {
-    if (!text) return null;
-    const parts = text.split(/(https?:\/\/[^\s]+)/g);
-    return parts.map((part, index) => {
-      if (/(https?:\/\/[^\s]+)/g.test(part)) {
-        return (
-          <Text
-            key={index}
-            style={{ textDecorationLine: 'underline', color: '#0000EE' }}
-            onPress={() => Linking.openURL(part)}
-          >
-            {part}
-          </Text>
-        );
-      }
-      return <Text key={index}>{part}</Text>;
-    });
-  };
-
-  const renderMessage = ({ item }: { item: any }) => {
-    const isMe = item.profiles?.name?.toLowerCase() === profile?.name?.toLowerCase();
-    const userName = isMe ? 'You' : item.profiles?.name || 'Unknown';
-    const avatarUrl = item.profiles?.avatar_url ?? null;
-    const hasImages = item.image_urls && item.image_urls.length > 0;
-
-    // Get the user's skill level for this activity
-    const getUserSkillLevel = () => {
-      if (isMe) return skillLevel;
-      // For other users, we'd need to join with user_activity_skills
-      // For now, return a default
-      return item.profiles?.user_activity_skills?.[0]?.skill_level ?? "Intermediate";
-    };
-    
-    const userSkillLevel = getUserSkillLevel();
-
-    // Find the message this is replying to
-    const replyToMessage = item.reply_to_id ? 
-      messages.find(msg => msg.id === item.reply_to_id) : null;
-    
-    return (
-    <Pressable 
-      style={[styles.messageContainer, {gap: 12}]}
-      onLongPress={() => handleLongPress(item)}
-      delayLongPress={500}
-    >
-      <View style={styles.messageContent}>
-          <Image
-            source={avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon}
-            style={styles.messageAvatar}
-          />
-          <View style={{ flex: 1 }}>
-            <View style={styles.messageHeader}>
-              <TouchableOpacity onPress={() => openUserChat(item)}>
-                <Text
-                  style={[styles.userName, !isMe && styles.clickableUserName]}
-                >
-                  {userName}
-                </Text>
-              </TouchableOpacity>
-              <View
-                style={[
-                  styles.skillBadge,
-                  { backgroundColor: getSkillColor(userSkillLevel) },
-                ]}
-              >
-                <Text style={styles.skillText}>{userSkillLevel}</Text>
-              </View>
-            </View>
-            {item.message ? (
-              <Text style={styles.messageText}>
-                {renderMessageText(item.message)}
-              </Text>
-            ) : null}
-            {hasImages && (
-              <View style={styles.imageGrid}>
-                {item.image_urls.map((url: string, index: number) => (
-                  <TouchableOpacity 
-                    key={index}
-                    onPress={() => openGallery(item.image_urls, index)}
-                    activeOpacity={0.9}
-                  >
-                    <Image
-                      source={{ uri: url }}
-                      style={[
-                        styles.messageImage,
-                        item.image_urls.length > 1
-                          ? styles.gridImage
-                          : styles.singleImage,
-                      ]}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-        </View>
-
-      {replyToMessage && (
-          <RepliedToMessage
-            replyToId={item.reply_to_id}
-            replyToMessage={replyToMessage}
-            messageItem={item}
-            scrollToMessage={scrollToMessage}
-          />
-        )}
-    </Pressable>
-  );};
+  const renderMessage = ({ item }: { item: any }) => (
+    <ForumMessageItem
+      item={item}
+      currentUserId={user?.id}
+      profileName={profile?.name}
+      messages={messages}
+      highlightedId={highlightedMessageId}
+      skillLevel={skillLevel}
+      onLongPress={handleLongPress}
+      onOpenChat={openUserChat}
+      onOpenGallery={openGallery}
+      onScrollToMessage={scrollToMessage}
+    />
+  );
 
   // Only show loading if we have an activity but messages are still loading
   if (loading && activityId) {
