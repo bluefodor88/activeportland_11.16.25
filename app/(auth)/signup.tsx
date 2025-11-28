@@ -1,21 +1,19 @@
+import { ActivitySelectionModal } from '@/components/ActivitySelectionModal';
+import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-  View,
+  Alert,
+  Dimensions,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
+  View
 } from 'react-native';
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useAuth } from '@/hooks/useAuth'
-import { useProfile } from '@/hooks/useProfile'
-import { ActivitySelectionModal } from '@/components/ActivitySelectionModal'
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 const { width } = Dimensions.get('window');
 const isSmallDevice = width < 375; // iPhone SE and smaller
@@ -29,8 +27,8 @@ export default function SignupScreen() {
   const [loading, setLoading] = useState(false);
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [signupStarted, setSignupStarted] = useState(false);
-  const { signUp, user } = useAuth()
-  const { updateSkillLevel, refetch } = useProfile()
+  const { signUp, user } = useAuth();
+  const { updateSkillLevel, refetch } = useProfile();
 
   // When user presses the create account button -> open activity modal first
   const handleSignupPress = () => {
@@ -62,7 +60,10 @@ export default function SignupScreen() {
       const { error, data } = await signUp(email, password, name);
 
       if (error || !data?.user) {
-        Alert.alert('Signup Error', error?.message || 'Failed to create account');
+        Alert.alert(
+          'Signup Error',
+          error?.message || 'Failed to create account'
+        );
         setLoading(false);
         setSignupStarted(false);
         return;
@@ -70,7 +71,6 @@ export default function SignupScreen() {
 
       // 2. Save activities using the NEW user ID from 'data.user.id'
       if (selectedActivities && selectedActivities.length > 0) {
-        
         // Capture the ID from the response
         const newUserId = data.user.id;
 
@@ -78,10 +78,10 @@ export default function SignupScreen() {
           try {
             // Pass newUserId as the 4th argument
             await updateSkillLevel(
-              item.activityId, 
-              item.skillLevel, 
-              item.readyToday, 
-              newUserId 
+              item.activityId,
+              item.skillLevel,
+              item.readyToday,
+              newUserId
             );
           } catch (err) {
             console.error('Failed to save activity', item, err);
@@ -92,7 +92,6 @@ export default function SignupScreen() {
       // 3. Refresh and Navigate
       await refetch();
       router.replace('/(tabs)');
-      
     } catch (err) {
       console.error('Error during finishSignup:', err);
       Alert.alert('Error', 'An unexpected error occurred.');
@@ -102,90 +101,94 @@ export default function SignupScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContainer}
+      keyboardShouldPersistTaps={'handled'}
+      showsVerticalScrollIndicator={false}
     >
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <Text style={styles.logo}>
-            <Text style={{ color: '#FFCF56' }}>The</Text>
-            <Text style={{ color: '#FF8C42' }}>Activity</Text>
-            <Text style={{ color: '#FFCF56' }}>Hub</Text>
+      <View style={styles.header}>
+        <Text style={styles.logo}>
+          <Text style={{ color: '#FFCF56' }}>The</Text>
+          <Text style={{ color: '#FF8C42' }}>Activity</Text>
+          <Text style={{ color: '#FFCF56' }}>Hub</Text>
+        </Text>
+        <View style={styles.logoUnderline} />
+        <Text style={styles.location}>Portland, ME</Text>
+      </View>
+
+      <View style={styles.form}>
+        <Text style={styles.title}>Create Account</Text>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Full Name</Text>
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholder="Enter your full name"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={[styles.input, {flex:1}]}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password (min 6 characters)"
+            secureTextEntry
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Confirm Password</Text>
+          <TextInput
+            style={styles.input}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            placeholder="Confirm your password"
+            secureTextEntry
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            (loading || signupStarted) && styles.buttonDisabled,
+          ]}
+          onPress={handleSignupPress}
+          disabled={loading || signupStarted}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? 'Processing...' : 'Create Account'}
           </Text>
-          <View style={styles.logoUnderline} />
-          <Text style={styles.location}>Portland, ME</Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.form}>
-          <Text style={styles.title}>Create Account</Text>
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Full Name</Text>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Enter your full name"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Create a password (min 6 characters)"
-              secureTextEntry
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Confirm Password</Text>
-            <TextInput
-              style={styles.input}
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirm your password"
-              secureTextEntry
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, (loading || signupStarted) && styles.buttonDisabled]}
-            onPress={handleSignupPress}
-            disabled={loading || signupStarted}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'Processing...' : 'Create Account'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => router.push('/(auth)/login')}
-          >
-            <Text style={styles.linkText}>
-              Already have an account? <Text style={styles.linkTextBold}>Sign In</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+        <TouchableOpacity
+          style={styles.linkButton}
+          onPress={() => router.push('/(auth)/login')}
+        >
+          <Text style={styles.linkText}>
+            Already have an account?{' '}
+            <Text style={styles.linkTextBold}>Sign In</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <ActivitySelectionModal
         visible={showActivityModal}
@@ -202,7 +205,7 @@ export default function SignupScreen() {
         }}
         isSignup={true}
       />
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }
 
