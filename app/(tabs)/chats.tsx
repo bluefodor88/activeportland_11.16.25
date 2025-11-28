@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   FlatList,
   StyleSheet,
   Image,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useChats } from '@/hooks/useChats';
@@ -17,13 +18,24 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ICONS } from '@/lib/helperUtils';
 
 export default function ChatsScreen() {
-  const { chats, loading } = useChats();
+  const { chats, loading, refetch } = useChats();
   const { checkUpcomingMeetings } = useMeetingReminder();
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Check for meeting reminders when chats screen loads
-  React.useEffect(() => {
-    checkUpcomingMeetings();
-  }, []);
+  // Refetches data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      checkUpcomingMeetings();
+      refetch();
+    }, [])
+  );
+
+  // Handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  };
 
   const openChat = (chatId: string, userName: string, otherUserId: string) => {
     router.push({
@@ -72,7 +84,7 @@ export default function ChatsScreen() {
     </TouchableOpacity>
   );
 
-  if (loading) {
+  if (loading && !refreshing && chats.length === 0) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
@@ -102,14 +114,20 @@ export default function ChatsScreen() {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         />
       ) : (
         <View style={styles.emptyState}>
-                <Ionicons name="chatbubble" size={64} color="#ccc" />
+          <Ionicons name="chatbubble" size={64} color="#ccc" />
           <Text style={styles.emptyTitle}>No conversations yet</Text>
           <Text style={styles.emptySubtitle}>
             Start chatting with people from the forum or people section
           </Text>
+          <TouchableOpacity onPress={onRefresh} style={{ marginTop: 20 }}>
+             <Text style={{ ...styles.emptySubtitle, color: '#FF8C42' }}>Tap to refresh</Text>
+          </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>

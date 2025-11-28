@@ -17,12 +17,6 @@ export function useChats() {
   const [chats, setChats] = useState<ChatPreview[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (user) {
-      fetchChats()
-    }
-  }, [user])
-
   const fetchChats = async () => {
     if (!user) return
 
@@ -92,6 +86,12 @@ export function useChats() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (user) {
+      fetchChats()
+    }
+  }, [user, fetchChats])
 
   return { chats, loading, refetch: fetchChats }
 }
