@@ -52,6 +52,7 @@ export default function ChatScreen() {
   const [selectedParticipants, setSelectedParticipants] = useState<Participant[]>([]);
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
 
   const [isGalleryVisible, setIsGalleryVisible] = useState(false);
   const [galleryImages, setGalleryImages] = useState<{ uri: string }[]>([]);
@@ -299,6 +300,7 @@ export default function ChatScreen() {
     }
 
     try {
+      setIsInviting(true);
       // Create the meetup invite
       const { data: inviteData, error } = await supabase
         .from('meetup_invites')
@@ -354,6 +356,8 @@ export default function ChatScreen() {
     } catch (error) {
       console.error('Error creating event:', error);
       Alert.alert('Error', 'Failed to send invite. Please try again.');
+    } finally {
+      setIsInviting(false);
     }
   };
 
@@ -844,10 +848,17 @@ export default function ChatScreen() {
             
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={styles.scheduleConfirmButton}
+                style={[styles.scheduleConfirmButton, isInviting && { opacity: 0.7 }]}
                 onPress={handleScheduleEvent}
+                disabled={isInviting}
               >
-                <Text style={styles.scheduleConfirmText}>Send Invite</Text>
+                {
+                  isInviting ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.scheduleConfirmText}>Send Invite</Text>
+                  )
+                }
               </TouchableOpacity>
               
               <TouchableOpacity
