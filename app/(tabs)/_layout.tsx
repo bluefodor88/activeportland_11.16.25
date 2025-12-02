@@ -7,15 +7,15 @@ import { View, Text, StyleSheet } from 'react-native';
 
 function ChatTabIcon({ size, color }: { size: number; color: string }) {
   const { chats } = useChats();
-  const totalUnread = chats.reduce((sum, chat) => sum + chat.unreadCount, 0);
+  const unreadChatCount = chats.filter(chat => chat.unreadCount > 0).length;
 
   return (
     <View style={styles.tabIconContainer}>
       <Ionicons name="chatbubble-outline" size={size} color={color} />
-      {totalUnread > 0 && (
+      {unreadChatCount > 0 && (
         <View style={styles.unreadBadge}>
           <Text style={styles.unreadText}>
-            {totalUnread > 99 ? '99+' : totalUnread.toString()}
+            {unreadChatCount > 99 ? '99+' : unreadChatCount.toString()}
           </Text>
         </View>
       )}

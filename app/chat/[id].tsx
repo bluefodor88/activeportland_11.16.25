@@ -22,7 +22,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useAuth } from '@/hooks/useAuth';
-import { getOrCreateChat } from '@/hooks/useChats';
+import { getOrCreateChat, useChats } from '@/hooks/useChats';
 import { supabase } from '@/lib/supabase';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ParticipantSelector } from '@/components/ParticipantSelector';
@@ -59,6 +59,7 @@ export default function ChatScreen() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   
   const { user } = useAuth();
+  const { markAsRead } = useChats();
   const { messages, loading: messagesLoading, error: messagesError, sendMessage } = useChatMessages(chatId);
   const { inviteParticipants } = useEventParticipants();
   const flatListRef = useRef<FlatList>(null);
@@ -589,6 +590,7 @@ export default function ChatScreen() {
     if (chatId) {
       fetchPendingInvites();
       fetchAcceptedMeetings();
+      markAsRead(chatId);
     }
   }, [chatId]);
 
