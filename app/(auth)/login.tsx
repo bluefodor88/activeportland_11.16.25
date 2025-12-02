@@ -1,19 +1,17 @@
+import { useAuth } from '@/hooks/useAuth';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
 import {
-  View,
+  Alert,
+  Dimensions,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Dimensions,
+  View,
 } from 'react-native';
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useAuth } from '@/hooks/useAuth'
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 
 const { width } = Dimensions.get('window');
 const isSmallDevice = width < 375; // iPhone SE and smaller
@@ -23,7 +21,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth()
+  const { signIn } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -33,12 +31,12 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const { error } = await signIn(email, password)
-      
+      const { error } = await signIn(email, password);
+
       if (error) {
-        Alert.alert('Error', error.message)
+        Alert.alert('Error', error.message);
       } else {
-        router.replace('/(tabs)')
+        router.replace('/(tabs)');
       }
     } catch (error) {
       Alert.alert('Error', 'Login failed. Please try again.');
@@ -48,70 +46,71 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContainer}
+      keyboardShouldPersistTaps={'handled'}
+      showsVerticalScrollIndicator={false}
     >
       <StatusBar style="dark" />
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <Text style={styles.logo}>
-            <Text style={{ color: '#FFCF56' }}>The</Text>
-            <Text style={{ color: '#FF8C42' }}>Activity</Text>
-            <Text style={{ color: '#FFCF56' }}>Hub</Text>
+      <View style={styles.header}>
+        <Text style={styles.logo}>
+          <Text style={{ color: '#FFCF56' }}>The</Text>
+          <Text style={{ color: '#FF8C42' }}>Activity</Text>
+          <Text style={{ color: '#FFCF56' }}>Hub</Text>
+        </Text>
+        <View style={styles.logoUnderline} />
+        <Text style={styles.location}>Portland, ME</Text>
+      </View>
+
+      <View style={styles.form}>
+        <Text style={styles.title}>Welcome Back</Text>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Enter your password"
+            secureTextEntry
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, loading && styles.buttonDisabled]}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? 'Signing In...' : 'Sign In'}
           </Text>
-          <View style={styles.logoUnderline} />
-          <Text style={styles.location}>Portland, ME</Text>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.form}>
-          <Text style={styles.title}>Welcome Back</Text>
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.input}
-              value={email}
-              onChangeText={setEmail}
-              placeholder="Enter your email"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={styles.input}
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Enter your password"
-              secureTextEntry
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, loading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            <Text style={styles.buttonText}>
-              {loading ? 'Signing In...' : 'Sign In'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => router.push('/(auth)/signup')}
-          >
-            <Text style={styles.linkText}>
-              Don't have an account? <Text style={styles.linkTextBold}>Sign Up</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <TouchableOpacity
+          style={styles.linkButton}
+          onPress={() => router.push('/(auth)/signup')}
+        >
+          <Text style={styles.linkText}>
+            Don't have an account?{' '}
+            <Text style={styles.linkTextBold}>Sign Up</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </KeyboardAwareScrollView>
   );
 }
 

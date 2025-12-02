@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 import type { ForumMessage } from '@/types/database'
+import { Alert } from 'react-native';
+import * as ImagePicker from 'expo-image-picker'
 
 export function useForumMessages(activityId?: string) {
   const { user } = useAuth()
@@ -10,9 +12,10 @@ export function useForumMessages(activityId?: string) {
 
   useEffect(() => {
     if (activityId) {
-      fetchMessages()
+      // 1. Load initial messages
+      fetchMessages(true) 
       
-      // Set up real-time subscription for new messages
+      // 2. Set up real-time listener
       const subscription = supabase
         .channel(`forum_messages_${activityId}`)
         .on('postgres_changes', 
@@ -22,26 +25,33 @@ export function useForumMessages(activityId?: string) {
             table: 'forum_messages',
             filter: `activity_id=eq.${activityId}`
           }, 
-          () => {
-            fetchMessages() // Refresh messages when new ones are added
-          }
+          () => fetchMessages(false)
         )
         .subscribe()
 
       return () => {
-        try {
-          subscription.unsubscribe()
-        } catch (error) {
-          console.error('Error unsubscribing from forum messages:', error)
-        }
+        supabase.removeChannel(subscription)
       }
     }
   }, [activityId])
 
-  const fetchMessages = async () => {
+  const requestPermissions = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Sorry, we need photo gallery permissions to send photo.'
+      );
+      return false;
+    }
+    return true;
+  };
+
+  const fetchMessages = async (showLoading = false) => {
     if (!activityId) return
 
-    setLoading(true)
+    if (showLoading) setLoading(true)
+      
     try {
       const { data, error } = await supabase
         .from('forum_messages')
@@ -50,6 +60,7 @@ export function useForumMessages(activityId?: string) {
           reply_to:forum_messages!reply_to_id (
             id,
             message,
+            image_urls,
             profiles!user_id (
               name
             )
@@ -72,60 +83,75 @@ export function useForumMessages(activityId?: string) {
         .eq('profiles.user_activity_skills.activity_id', activityId)
         .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error('Error fetching forum messages:', error)
-        setMessages([])
-      } else {
-        setMessages(data || [])
-      }
+      if (error) throw error
+      setMessages(data || [])
     } catch (error) {
-      console.error('Error fetching forum messages:', error)
-      setMessages([])
+      console.error('Error fetching messages:', error)
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
-  const sendMessage = async (message: string, replyToId?: string) => {
-    if (!activityId || !message.trim()) {
-      console.error('Cannot send message: missing activity ID or empty message')
-      return false
-    }
+  // Helper: Upload Image
+  const uploadImage = async (uri: string) => {
+    const hasPermission = await requestPermissions();
+    if (!hasPermission) return;
+    
+    try {
+      const response = await fetch(uri)
+      const arrayBuffer = await response.arrayBuffer()
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`
+      
+      const { error } = await supabase.storage
+        .from('chat-images') // Reusing your existing bucket
+        .upload(fileName, arrayBuffer, { contentType: 'image/png' })
 
-    // Validate message length
+      if (error) throw error
+      
+      const { data } = supabase.storage.from('chat-images').getPublicUrl(fileName)
+      return data.publicUrl
+    } catch (error) {
+      console.error('Upload failed:', error)
+      return null
+    }
+  }
+
+  // Updated sendMessage to accept images
+  const sendMessage = async (message: string, replyToId?: string, imageUris: string[] = []) => {
+    if (!activityId || !user) return false
+    if (!message.trim() && imageUris.length === 0) return false
+
     if (message.trim().length > 1000) {
-      console.error('Message too long')
+      Alert.alert('Message too long')
       return false
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        console.error('User not authenticated')
-        return false
-      }
+      // 1. Upload Images
+      const uploadPromises = imageUris.map(uri => uploadImage(uri))
+      const uploadedUrls = await Promise.all(uploadPromises)
+      const validUrls = uploadedUrls.filter(url => url !== null) as string[]
 
+      // 2. Insert Message
       const { error } = await supabase
         .from('forum_messages')
         .insert({
           activity_id: activityId,
           user_id: user.id,
           message: message.trim(),
-          reply_to_id: replyToId || null
+          reply_to_id: replyToId || null,
+          image_urls: validUrls
         })
 
-      if (error) {
-        console.error('Error sending message:', error)
-        return false
-      } else {
-        fetchMessages() // Refresh messages
-        return true
-      }
+      if (error) throw error
+
+      fetchMessages(false) 
+      return true
     } catch (error) {
       console.error('Error sending message:', error)
       return false
     }
   }
 
-  return { messages, loading, sendMessage, refetch: fetchMessages }
+  return { messages, loading, sendMessage, refetch: () => fetchMessages(false) }
 }

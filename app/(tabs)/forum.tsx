@@ -1,29 +1,32 @@
-import React, { useState } from 'react';
+import { ActivityCarousel } from '@/components/ActivityCarousel';
+import ForumMessageItem from '@/components/ForumMessageItem';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { useAuth } from '@/hooks/useAuth';
+import { getOrCreateChat } from '@/hooks/useChats';
+import { useForumMessages } from '@/hooks/useForumMessages';
+import { useProfile } from '@/hooks/useProfile';
+import { useActivityStore } from '@/store/useActivityStore';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import React, { useRef, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  Alert,
-  Pressable,
+  View
 } from 'react-native';
+import ImageView from "react-native-image-viewing";
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useForumMessages } from '@/hooks/useForumMessages';
-import { useProfile } from '@/hooks/useProfile';
-import { getOrCreateChat } from '@/hooks/useChats';
-import { useAuth } from '@/hooks/useAuth';
-import { ActivityCarousel } from '@/components/ActivityCarousel';
-import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { useActivityStore } from '@/store/useActivityStore';
-import { ICONS } from '@/lib/helperUtils';
 
 
 export default function ForumScreen() {
@@ -34,21 +37,62 @@ export default function ForumScreen() {
   const { user } = useAuth();
   const [newMessage, setNewMessage] = useState('');
   const [replyingTo, setReplyingTo] = useState<any>(null);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [isSending, setIsSending] = useState<boolean>(false);
+
+  const [isGalleryVisible, setIsGalleryVisible] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<{ uri: string }[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
+
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 4,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      const uris = result.assets.map(asset => asset.uri);
+      setSelectedImages(prev => [...prev, ...uris]);
+    }
+  };
+
+  const flatListRef = useRef<FlatList>(null);
+
+  const openGallery = (imageUrls: string[], index: number) => {
+    const formattedImages = imageUrls.map(url => ({ uri: url }));
+    setGalleryImages(formattedImages);
+    setGalleryIndex(index);
+    setIsGalleryVisible(true);
+  };
 
   const handleSendMessage = async () => {
-    if (newMessage.trim()) {
-      if (newMessage.trim().length > 1000) {
-        Alert.alert('Message Too Long', 'Please keep messages under 1000 characters');
-        return;
-      }
-      
-      const success = await sendMessage(newMessage, replyingTo?.id);
+    if (!newMessage.trim() && selectedImages.length === 0) return;
+    
+    if (newMessage.trim().length > 1000) {
+      Alert.alert('Message Too Long', 'Please keep messages under 1000 characters');
+      return;
+    }
+
+    setIsSending(true);
+
+    try {
+      const success = await sendMessage(newMessage, replyingTo?.id, selectedImages);
       if (success) {
         setNewMessage('');
         setReplyingTo(null);
+        setSelectedImages([]);
       } else {
-        Alert.alert('Error', 'Failed to send message. Please try again.');
+        Alert.alert('Error', 'Failed to send message.');
       }
+    } catch (error) {
+      console.error(error);
+      Alert.alert('Error', 'An unexpected error occurred.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -60,9 +104,6 @@ export default function ForumScreen() {
 
   const cancelReply = () => {
     setReplyingTo(null);
-  };
-  const formatTime = (date: Date) => {
-    return new Date(date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const openUserChat = async (message: any) => {
@@ -81,68 +122,43 @@ export default function ForumScreen() {
     }
   };
 
-  const getSkillColor = (skillLevel: string) => {
-    switch (skillLevel) {
-      case 'Beginner':
-        return '#4CAF50';
-      case 'Intermediate':
-        return '#FFBF00';
-      case 'Advanced':
-        return '#FF9800';
-      default:
-        return '#999';
+  const scrollToMessage = (messageId: string) => {
+    const index = messages.findIndex(msg => msg.id === messageId);
+  
+    if (index !== -1 && flatListRef.current) {
+      flatListRef.current.scrollToIndex({ 
+        index, 
+        animated: true,
+        viewPosition: 0.5 
+      });
+
+      // Trigger the Highlight
+      setHighlightedMessageId(messageId);
+      
+      // Clear the ID after animation finishes (approx 2 seconds) so it can be highlighted again later
+      setTimeout(() => {
+        setHighlightedMessageId(null);
+      }, 2000);
+
+    } else {
+      Alert.alert("Message not found", "The message you are looking for might be too old or deleted.");
     }
   };
 
-  const renderMessage = ({ item }: { item: any }) => {
-    const isMe = item.profiles?.name?.toLowerCase() === profile?.name?.toLowerCase();
-    const userName = isMe ? 'You' : item.profiles?.name || 'Unknown';
-    const avatarUrl = item.profiles?.avatar_url ?? null;
-    
-    // Get the user's skill level for this activity
-    const getUserSkillLevel = () => {
-      if (isMe) return skillLevel;
-      // For other users, we'd need to join with user_activity_skills
-      // For now, return a default
-      return item.profiles?.user_activity_skills?.[0]?.skill_level ?? "Intermediate";
-    };
-    
-    const userSkillLevel = getUserSkillLevel();
-
-    // Find the message this is replying to
-    const replyToMessage = item.reply_to_id ? 
-      messages.find(msg => msg.id === item.reply_to_id) : null;
-    
-    return (
-    <Pressable 
-      style={styles.messageContainer}
-      onLongPress={() => handleLongPress(item)}
-      delayLongPress={500}
-    >
-      {replyToMessage && (
-        <View style={styles.replyContainer}>
-                <Ionicons name="arrow-undo" size={14} color="#666" />
-          <Text style={styles.replyText}>
-            Replying to {replyToMessage.profiles?.name || 'Unknown'}: {replyToMessage.message.substring(0, 50)}...
-          </Text>
-        </View>
-      )}
-      <Image source={ avatarUrl ? { uri: avatarUrl } : ICONS.profileIcon} style={styles.messageAvatar} />
-      <View style={styles.messageContent}>
-      <View style={styles.messageHeader}>
-        <TouchableOpacity onPress={() => openUserChat(item)}>
-          <Text style={[styles.userName, !isMe && styles.clickableUserName]}>
-            {userName}
-          </Text>
-        </TouchableOpacity>
-        <View style={[styles.skillBadge, { backgroundColor: getSkillColor(userSkillLevel) }]}>
-          <Text style={styles.skillText}>{userSkillLevel}</Text>
-        </View>
-      </View>
-      <Text style={styles.messageText}>{item.message}</Text>
-      </View>
-    </Pressable>
-  );};
+  const renderMessage = ({ item }: { item: any }) => (
+    <ForumMessageItem
+      item={item}
+      currentUserId={user?.id}
+      profileName={profile?.name}
+      messages={messages}
+      highlightedId={highlightedMessageId}
+      skillLevel={skillLevel}
+      onLongPress={handleLongPress}
+      onOpenChat={openUserChat}
+      onOpenGallery={openGallery}
+      onScrollToMessage={scrollToMessage}
+    />
+  );
 
   // Only show loading if we have an activity but messages are still loading
   if (loading && activityId) {
@@ -178,12 +194,16 @@ export default function ForumScreen() {
 
         {activityId ? (
           <FlatList
+            ref={flatListRef}
             inverted
             data={messages}
             renderItem={renderMessage}
             keyExtractor={(item) => item.id}
             style={styles.messagesList}
             contentContainerStyle={styles.messagesContainer}
+            onScrollToIndexFailed={(info)=>{
+              flatListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+            }}
           />
         ) : (
           <View style={styles.emptyState}>
@@ -207,28 +227,76 @@ export default function ForumScreen() {
                     <Ionicons name="close" size={16} color="#666" />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.replyPreviewMessage} numberOfLines={2}>
-                  {replyingTo.message}
-                </Text>
+                {
+                  replyingTo.message ? (
+                    <Text style={styles.replyPreviewMessage} numberOfLines={2}>
+                      {replyingTo.message}
+                    </Text>
+                  ) : null
+                }
               </View>
             )}
-          <View style={styles.inputContainer}>
-            <TextInput
-              style={styles.textInput}
-              value={newMessage}
-              onChangeText={setNewMessage}
-              placeholder={replyingTo ? `Reply to ${replyingTo.profiles?.name || 'Unknown'}...` : "Type your message..."}
-              placeholderTextColor="#999"
-              maxLength={1000}
-              multiline
-            />
-            <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
-                <Ionicons name="send" size={20} color="white" />
-            </TouchableOpacity>
-          </View>
+
+            <View style={styles.inputWrapper}>
+              {selectedImages.length > 0 && (
+                <ScrollView horizontal contentContainerStyle={styles.previewContainer} showsHorizontalScrollIndicator={false}>
+                  {selectedImages.map((uri, index) => (
+                    <View key={index} style={styles.previewItem}>
+                      <Image source={{ uri }} style={styles.previewImage} />
+                      <TouchableOpacity 
+                        style={styles.removeImageButton} 
+                        onPress={() => setSelectedImages(imgs => imgs.filter((_, i) => i !== index))}
+                      >
+                        <Ionicons name="close-circle" size={20} color="white" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+              <View style={styles.inputContainer}>
+                <TouchableOpacity 
+                  style={[styles.sendButton, {marginRight: 10}, isSending && {opacity: 0.5}]} 
+                  onPress={pickImage} 
+                  disabled={isSending}>
+                  <Ionicons name="add-circle" size={28} color="white" />
+                </TouchableOpacity>
+                <TextInput
+                  style={styles.textInput}
+                  value={newMessage}
+                  onChangeText={setNewMessage}
+                  placeholder={replyingTo ? `Reply to ${replyingTo.profiles?.name || 'Unknown'}...` : "Type your message..."}
+                  placeholderTextColor="#999"
+                  maxLength={1000}
+                  multiline
+                  editable={!isSending}
+                />
+                <TouchableOpacity 
+                  style={[
+                    styles.sendButton, 
+                    (isSending || (!newMessage.trim() && selectedImages.length === 0)) && { opacity: 0.7 }
+                  ]} 
+                  onPress={handleSendMessage}
+                  disabled={isSending || (!newMessage.trim() && selectedImages.length === 0)}
+                >
+                  {isSending ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Ionicons name="send" size={20} color="white" />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
           </>
         )}
       </KeyboardAvoidingView>
+      <ImageView
+        images={galleryImages}
+        imageIndex={galleryIndex}
+        visible={isGalleryVisible}
+        onRequestClose={() => setIsGalleryVisible(false)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+      />
     </SafeAreaView>
   );
 }
@@ -312,7 +380,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   messageContainer: {
-    flexDirection: 'row',
     backgroundColor: 'white',
     padding: 16,
     borderRadius: 12,
@@ -333,10 +400,11 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 12,
   },
   messageContent: {
     flex: 1,
+    flexDirection: 'row',
+    gap: 12
   },
   messageHeader: {
     flexDirection: 'row',
@@ -357,7 +425,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
-    marginRight: 8,
   },
   skillText: {
     fontSize: 10,
@@ -374,7 +441,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
     color: '#333',
-    lineHeight: 20,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -476,5 +542,54 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     color: '#666',
     fontStyle: 'italic',
+  },
+  attachButton: {
+    marginRight: 10,
+    justifyContent: 'center',
+  },
+  inputWrapper: {
+    backgroundColor: 'white',
+  },
+  previewContainer: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  previewItem: {
+    marginRight: 10,
+  },
+  previewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  messageImage: {
+    borderRadius: 8,
+    backgroundColor: '#eee',
+  },
+  singleImage: {
+    width: 200,
+    height: 200,
+    resizeMode: 'cover',
+  },
+  gridImage: {
+    width: 80,
+    height: 80,
+    resizeMode: 'cover',
   },
 });

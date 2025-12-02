@@ -2,13 +2,16 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './useAuth'
 import { calculateDistance, formatDistance, getCurrentLocation } from '@/lib/locationUtils'
-import type { Profile, UserActivitySkill } from '@/types/database'
 import { useActivityStore } from '@/store/useActivityStore';
 
-interface PersonWithSkill extends Profile {
+interface PersonWithSkill {
+  id: string
+  name: string
+  email: string
+  avatar_url: string | null
   skill_level: string
   distance: string
-  distanceValue: number
+  distanceValue: number 
   ready_today: boolean
 }
 
@@ -19,17 +22,24 @@ export function usePeople() {
   const [loading, setLoading] = useState(true)
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null)
 
+  // Effect 1: Get User Location ONCE on mount
   useEffect(() => {
-    // Get user's current location when component mounts
-    getCurrentLocation().then(setUserLocation)
-    
+    getCurrentLocation().then((location) => {
+      if (location) {
+        setUserLocation(location);
+      }
+    });
+  }, []);
+
+  // Effect 2: Fetch People when dependencies change
+  useEffect(() => {
     if (activityId && user) {
-      fetchPeople()
+      fetchPeople();
     } else {
-      setPeople([])
-      setLoading(false)
+      setPeople([]);
+      setLoading(false);
     }
-  }, [activityId, user])
+  }, [activityId, user, userLocation]);
 
   const fetchPeople = async () => {
     if (!activityId || !user) {
@@ -38,6 +48,12 @@ export function usePeople() {
     }
     
     setLoading(true)
+
+    let currentLoc = userLocation;
+    if (!currentLoc) {
+      currentLoc = await getCurrentLocation();
+      if (currentLoc) setUserLocation(currentLoc);
+    }
     
     try {
       const { data, error } = await supabase
@@ -68,33 +84,33 @@ export function usePeople() {
         console.error('Error fetching people:', error)
         setPeople([])
       } else if (data) {
-        // Filter out current user and process data
-        const filteredData = data.filter(item => {
-          const hasProfile = item.profiles && typeof item.profiles === 'object'
-          const isNotCurrentUser = item.user_id !== user.id
-          return hasProfile && isNotCurrentUser
+        const filteredData = data?.filter(item => {
+          const profileData = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
+          return profileData && item.user_id !== user.id;
         })
         
-        const peopleWithSkills = filteredData.map(item => ({
-          id: item.profiles.id, // This should be the UUID from profiles table
-          name: item.profiles.name,
-          email: item.profiles.email,
-          avatar_url: item.profiles.avatar_url,
-          created_at: item.profiles.created_at,
-          updated_at: item.profiles.updated_at,
-          skill_level: item.skill_level,
-          ready_today: item.ready_today ?? false,
-          distance: calculateDistanceForUser(item.profiles),
-          distanceValue: calculateDistanceValueForUser(item.profiles)
-        }))
+        const peopleWithSkills = filteredData?.map(item => {
+          const profile = Array.isArray(item.profiles) ? item.profiles[0] : item.profiles;
+          
+          return {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email,
+            avatar_url: profile.avatar_url,
+            skill_level: item.skill_level,
+            ready_today: item.ready_today ?? false,
+            distance: calculateDistanceForUser(profile, currentLoc), 
+            distanceValue: calculateDistanceValueForUser(profile, currentLoc)
+          };
+        })
         
         // Sort by ready_today first (ready people at top), then by distance
-        peopleWithSkills.sort((a, b) => {
-          // First sort by ready_today (true comes first)
+        peopleWithSkills?.sort((a, b) => {
+          // Priority 1: Ready Today (true first)
           if (a.ready_today !== b.ready_today) {
             return a.ready_today ? -1 : 1
           }
-          // Then sort by distance (closest first)
+          // Priority 2: Distance (closest first)
           return a.distanceValue - b.distanceValue
         })
         
@@ -110,42 +126,22 @@ export function usePeople() {
     }
   }
 
-  const calculateDistanceForUser = (profile: any): string => {
-    // If user hasn't enabled location sharing, show generic message
-    if (!profile.location_sharing_enabled) {
-      return 'Location private'
-    }
-
-    // If we don't have user's location or profile's location, use mock data
-    if (!userLocation || !profile.latitude || !profile.longitude) {
-      const mockDistance = Math.random() * 15 + 0.5 // 0.5 to 15.5 miles
-      return formatDistance(mockDistance)
-    }
-
-    // Calculate real distance
-    const distance = calculateDistance(
-      userLocation,
-      { latitude: profile.latitude, longitude: profile.longitude }
-    )
-    return formatDistance(distance)
+  // Helper to get formatted string
+  const calculateDistanceForUser = (profile: any, currentLoc: any): string => {
+    if (!profile.location_sharing_enabled) return 'Location private'
+    if (!currentLoc || !profile.latitude || !profile.longitude) return '...'
+    
+    const dist = calculateDistance(currentLoc, { latitude: profile.latitude, longitude: profile.longitude })
+    return formatDistance(dist)
   }
 
-  const calculateDistanceValueForUser = (profile: any): number => {
-    // If user hasn't enabled location sharing, put them at the end
-    if (!profile.location_sharing_enabled) {
-      return 999
-    }
+  // Helper to get number for sorting
+  const calculateDistanceValueForUser = (profile: any, currentLoc: any): number => {
+    // If no location, return a huge number so they go to bottom of list
+    if (!profile.location_sharing_enabled) return 999999
+    if (!currentLoc || !profile.latitude || !profile.longitude) return 999998
     
-    // If we don't have location data, use mock distance for sorting
-    if (!userLocation || !profile.latitude || !profile.longitude) {
-      return Math.random() * 15 + 0.5
-    }
-    
-    // Calculate real distance for sorting
-    return calculateDistance(
-      userLocation,
-      { latitude: profile.latitude, longitude: profile.longitude }
-    )
+    return calculateDistance(currentLoc, { latitude: profile.latitude, longitude: profile.longitude })
   }
 
   const updateReadyToday = async (activityId: string, ready: boolean) => {

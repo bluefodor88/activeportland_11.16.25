@@ -1,3 +1,5 @@
+import * as Location from 'expo-location';
+
 /**
  * Location utilities for calculating distances between users
  */
@@ -49,16 +51,25 @@ export function formatDistance(distance: number): string {
 }
 
 /**
- * Get user's current location (for production use)
- * Returns mock data for development
+ * Get user's REAL current location
  */
 export async function getCurrentLocation(): Promise<LocationCoordinates | null> {
   try {
-    // In production, this would use expo-location
-    // For now, return mock Portland, ME coordinates
+    // check permissions first
+    const { status } = await Location.getForegroundPermissionsAsync();
+    
+    if (status !== 'granted') {
+      console.log('Permission not granted for location');
+      return null;
+    }
+
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+
     return {
-      latitude: 43.6591 + (Math.random() - 0.5) * 0.01,
-      longitude: -70.2568 + (Math.random() - 0.5) * 0.01,
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
     };
   } catch (error) {
     console.error('Error getting location:', error);

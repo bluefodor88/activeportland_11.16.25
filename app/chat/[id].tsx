@@ -6,24 +6,28 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Modal,
   ScrollView,
   Alert,
+  Linking,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import ImageView from "react-native-image-viewing";
 import { useLocalSearchParams, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useAuth } from '@/hooks/useAuth';
-import { getOrCreateChat } from '@/hooks/useChats';
+import { getOrCreateChat, useChats } from '@/hooks/useChats';
 import { supabase } from '@/lib/supabase';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { ParticipantSelector } from '@/components/ParticipantSelector';
-import { useChatContacts } from '@/hooks/useChatContacts';
 import { useEventParticipants } from '@/hooks/useEventParticipants';
+import * as ImagePicker from 'expo-image-picker'
 
 interface Participant {
   id: string
@@ -39,7 +43,6 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showScheduleModal, setShowScheduleModal] = useState(false);
-  const [eventTitle, setEventTitle] = useState('');
   const [eventLocation, setEventLocation] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
@@ -47,45 +50,41 @@ export default function ChatScreen() {
   const [acceptedMeetings, setAcceptedMeetings] = useState<any[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedParticipants, setSelectedParticipants] = useState<Participant[]>([]);
+  const [selectedImages, setSelectedImages] = useState<string[]>([]);
+  const [isSending, setIsSending] = useState(false);
+  const [isInviting, setIsInviting] = useState(false);
+
+  const [isGalleryVisible, setIsGalleryVisible] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<{ uri: string }[]>([]);
+  const [galleryIndex, setGalleryIndex] = useState(0);
   
   const { user } = useAuth();
+  const { markAsRead, setActiveChat } = useChats();
   const { messages, loading: messagesLoading, error: messagesError, sendMessage } = useChatMessages(chatId);
   const { inviteParticipants } = useEventParticipants();
   const flatListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    initializeChat();
-    if (chatId) {
-      fetchPendingInvites();
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 4,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      // result.assets contains the array of selected images
+      const uris = result.assets.map(asset => asset.uri);
+      setSelectedImages(prev => [...prev, ...uris]);
     }
-  }, [id, user]);
+  };
 
-  useEffect(() => {
-    if (chatId) {
-      fetchPendingInvites();
-      fetchAcceptedMeetings();
-    }
-  }, [chatId]);
-
-  // Update current time every minute for countdown timers
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60000); // Update every minute
-
-    return () => clearInterval(timer);
-  }, []);
-
-  // Auto-scroll to bottom when messages change (debounced to prevent excessive calls)
-  useEffect(() => {
-    if (combinedData && combinedData.length > 0 && flatListRef.current) {
-      const timeoutId = setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [combinedData?.length || 0]);
+  const openGallery = (imageUrls: string[], index: number) => {
+    const formattedImages = imageUrls.map(url => ({ uri: url }));
+    setGalleryImages(formattedImages);
+    setGalleryIndex(index);
+    setIsGalleryVisible(true);
+  };
 
   // Generate available dates (next 3 weeks)
   const generateAvailableDates = () => {
@@ -108,7 +107,7 @@ export default function ChatScreen() {
 
   // Combine all data for FlatList (memoized to prevent memory leaks)
   const combinedData = useMemo(() => {
-    const data = [];
+    const data: any[] = [];
     
     // Add accepted meetings first
     acceptedMeetings.forEach((meeting) => {
@@ -257,20 +256,29 @@ export default function ChatScreen() {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage?.trim() || !chatId || !user) {
-      Alert.alert('Error', 'Cannot send message - missing required information');
+    // Check if BOTH text and images are empty
+    if ((!newMessage.trim() && selectedImages.length === 0) || !chatId || !user) {
       return;
     }
+
+    if (isSending) return;
 
     if (newMessage.trim().length > 1000) {
       Alert.alert('Message Too Long', 'Please keep messages under 1000 characters');
       return;
     }
 
+    if ((!newMessage.trim() && !selectedImages) || !chatId || !user) {
+      return;
+    }
+
     try {
-      const success = await sendMessage(newMessage);
+      setIsSending(true);
+
+      const success = await sendMessage(newMessage, selectedImages);
       if (success) {
         setNewMessage('');
+        setSelectedImages([]);
         // Scroll to bottom after sending message
         setTimeout(() => {
           flatListRef.current?.scrollToEnd({ animated: true });
@@ -281,6 +289,8 @@ export default function ChatScreen() {
     } catch (error) {
       console.error('Error in handleSendMessage:', error);
       Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -291,6 +301,7 @@ export default function ChatScreen() {
     }
 
     try {
+      setIsInviting(true);
       // Create the meetup invite
       const { data: inviteData, error } = await supabase
         .from('meetup_invites')
@@ -346,6 +357,8 @@ export default function ChatScreen() {
     } catch (error) {
       console.error('Error creating event:', error);
       Alert.alert('Error', 'Failed to send invite. Please try again.');
+    } finally {
+      setIsInviting(false);
     }
   };
 
@@ -383,14 +396,66 @@ export default function ChatScreen() {
     return new Date(dateString).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const renderMessageText = (text: string, isMe: boolean) => {
+    // Split text by URLs (starts with http:// or https://)
+    const parts = text.split(/(https?:\/\/[^\s]+)/g);
+
+    return parts.map((part, index) => {
+      // If this part is a URL
+      if (/(https?:\/\/[^\s]+)/g.test(part)) {
+        return (
+          <Text
+            key={index}
+            style={{
+              textDecorationLine: 'underline',
+              color: isMe ? 'white' : '#0000EE',
+              fontWeight: 'bold'
+            }}
+            onPress={() => Linking.openURL(part)}
+          >
+            {part}
+          </Text>
+        );
+      }
+      // Normal text
+      return <Text key={index}>{part}</Text>;
+    });
+  };
+
   const renderMessage = ({ item }: { item: any }) => {
     const isMe = item.sender_id === user?.id;
+    const hasImages = item.image_urls && item.image_urls.length > 0;
     
     return (
       <View style={[styles.messageContainer, isMe ? styles.myMessage : styles.otherMessage]}>
-        <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
-          {item.message}
-        </Text>
+        {/* Render Image Gallery */}
+        {hasImages && (
+          <View style={styles.imageGrid}>
+            {item.image_urls.map((url: string, index: number) => (
+              <TouchableOpacity 
+                key={index}
+                onPress={() => openGallery(item.image_urls, index)}
+                activeOpacity={0.9}
+              >
+                <Image 
+                  source={{ uri: url }} 
+                  style={[
+                    styles.messageImage, 
+                    item.image_urls.length > 1 ? styles.gridImage : styles.singleImage
+                  ]} 
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+        
+        {item.message ? (
+          <Text style={[styles.messageText, isMe ? styles.myMessageText : styles.otherMessageText]}>
+             {renderMessageText(item.message, isMe)}
+          </Text>
+        ) : null}
+        
         <Text style={[styles.timestamp, isMe ? styles.myTimestamp : styles.otherTimestamp]}>
           {formatTime(item.created_at)}
         </Text>
@@ -514,9 +579,62 @@ export default function ChatScreen() {
     );
   };
 
+  useEffect(() => {
+    initializeChat();
+    if (chatId) {
+      fetchPendingInvites();
+    }
+  }, [id, user]);
+
+  useEffect(() => {
+    if (chatId) {
+      fetchPendingInvites();
+      fetchAcceptedMeetings();
+      markAsRead(chatId);
+    }
+  }, [chatId]);
+
+  // Update current time every minute for countdown timers
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Auto-scroll to bottom when messages change (debounced to prevent excessive calls)
+  useEffect(() => {
+    if (combinedData && combinedData.length > 0 && flatListRef.current) {
+      const timeoutId = setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [combinedData?.length || 0]);
+
+  // 1. Set this chat as "Active" so badges stay hidden while we are here
+  useEffect(() => {
+    if (chatId) {
+      setActiveChat(chatId);
+    }
+    // Cleanup: When leaving the screen, clear the active chat
+    return () => {
+      setActiveChat(null);
+    };
+  }, [chatId]);
+
+  // 2. Whenever a NEW message arrives (messages array changes), mark it as read immediately
+  useEffect(() => {
+    if (chatId && messages.length > 0) {
+      markAsRead(chatId);
+    }
+  }, [messages.length, chatId]);
+
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -535,7 +653,7 @@ export default function ChatScreen() {
 
   if (error || !chatId) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <StatusBar style="dark" />
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -555,7 +673,7 @@ export default function ChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
       
       <View style={styles.header}>
@@ -574,7 +692,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView 
         style={styles.keyboardContainer}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        // keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         {messagesLoading ? (
           <View style={styles.centerContainer}>
@@ -611,24 +729,56 @@ export default function ChatScreen() {
           </View>
         )}
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={newMessage}
-            onChangeText={setNewMessage}
-            placeholder="Type a message..."
-            placeholderTextColor="#999"
-            maxLength={1000}
-            multiline
-          />
-          <TouchableOpacity 
-            style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]} 
-            onPress={handleSendMessage}
-            disabled={!newMessage.trim()}
-          >
+        
+          <View style={styles.inputWrapper}>
+            {selectedImages?.length > 0 && (
+              <ScrollView horizontal contentContainerStyle={styles.previewContainer} showsHorizontalScrollIndicator={false}>
+                {selectedImages?.map((uri, index) => (
+                  <View key={index} style={styles.previewItem}>
+                    <Image source={{ uri }} style={styles.previewImage} />
+                    <TouchableOpacity 
+                      style={styles.removeImageButton} 
+                      onPress={() => setSelectedImages(imgs => imgs.filter((_, i) => i !== index))}
+                    >
+                      <Ionicons name="close-circle" size={20} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+            <View style={styles.inputContainer}>
+              <TouchableOpacity style={[styles.sendButton, {marginRight: 10}]} onPress={pickImage}>
+                <Ionicons name="add-circle" size={28} color="white" />
+              </TouchableOpacity>
+              <TextInput
+                style={styles.textInput}
+                value={newMessage}
+                onChangeText={setNewMessage}
+                placeholder="Type a message..."
+                placeholderTextColor="#999"
+                maxLength={1000}
+                multiline
+              />
+              <TouchableOpacity
+              style={[
+                styles.sendButton,
+                ((!newMessage.trim() && selectedImages.length === 0) ||
+                  isSending) &&
+                  styles.sendButtonDisabled,
+              ]}
+              onPress={handleSendMessage}
+              disabled={
+                (!newMessage.trim() && selectedImages.length === 0) || isSending
+              }
+            >
+              {isSending ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
                 <Ionicons name="send" size={20} color="white" />
-          </TouchableOpacity>
-        </View>
+              )}
+            </TouchableOpacity>
+            </View>
+          </View>
       </KeyboardAvoidingView>
 
       <Modal
@@ -711,17 +861,24 @@ export default function ChatScreen() {
                   selectedParticipants={selectedParticipants}
                   onParticipantsChange={setSelectedParticipants}
                   maxParticipants={7}
-                  excludeUserIds={[user?.id || '', id]} // Exclude self and chat partner
+                  // excludeUserIds={[user?.id || '', id]} // Exclude self and chat partner
                 />
               </View>
             </ScrollView>
             
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={styles.scheduleConfirmButton}
+                style={[styles.scheduleConfirmButton, isInviting && { opacity: 0.7 }]}
                 onPress={handleScheduleEvent}
+                disabled={isInviting}
               >
-                <Text style={styles.scheduleConfirmText}>Send Invite</Text>
+                {
+                  isInviting ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={styles.scheduleConfirmText}>Send Invite</Text>
+                  )
+                }
               </TouchableOpacity>
               
               <TouchableOpacity
@@ -734,6 +891,14 @@ export default function ChatScreen() {
           </View>
         </View>
       </Modal>
+      <ImageView
+        images={galleryImages}
+        imageIndex={galleryIndex}
+        visible={isGalleryVisible}
+        onRequestClose={() => setIsGalleryVisible(false)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+      />
     </SafeAreaView>
   );
 }
@@ -1115,5 +1280,57 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter_400Regular',
     color: '#333',
+  },
+  inputWrapper: {
+    backgroundColor: 'white',
+    // paddingBottom: Platform.OS === 'ios' ? 20 : 0, // specialized padding
+  },
+  previewContainer: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  attachButton: {
+    marginRight: 10,
+    justifyContent: 'center',
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 8,
+  },
+  messageImage: {
+    borderRadius: 8,
+    backgroundColor: '#e1e4e8',
+    marginBottom: 4,
+  },
+  singleImage: {
+    width: 200,
+    height: 200,
+    resizeMode: 'cover',
+  },
+  gridImage: {
+    width: 100, 
+    height: 100,
+    resizeMode: 'cover',
+  },
+  previewItem: {
+    marginRight: 10,
+    position: 'relative',
+  },
+  previewImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 12,
   },
 });

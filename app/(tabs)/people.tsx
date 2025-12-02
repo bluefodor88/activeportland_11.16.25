@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   FlatList,
   StyleSheet,
   Image,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -17,24 +18,28 @@ import { getOrCreateChat } from '@/hooks/useChats';
 import { useAuth } from '@/hooks/useAuth';
 import { ActivityCarousel } from '@/components/ActivityCarousel';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { useActivityStore } from '@/store/useActivityStore';
 import { ICONS } from '@/lib/helperUtils';
 
 
 export default function PeopleScreen() {
-  const { activityId, activity, skillLevel, emoji } = useActivityStore();
   const { user } = useAuth();
-  const { location, locationPermission, updateLocation, requestLocationPermission } = useLocationTracking();
+  const { requestLocationPermission } = useLocationTracking();
+
+  const [refreshing, setRefreshing] = useState(false);
 
   const { people, loading, refetch } = usePeople();
 
-  const sortedPeople = useMemo(() => {
-    return [...(people || [])].sort((a, b) => {
-      if (a.ready_today && !b.ready_today) return -1;
-      if (!a.ready_today && b.ready_today) return 1;
-      return 0;
-    });
-  }, [people]);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    
+    // 1. Check permissions and get latest location
+    await requestLocationPermission();
+    
+    // 2. Reload the list
+    await refetch();
+    
+    setRefreshing(false);
+  };
 
   const openChat = async (userId: string, userName: string) => {
     if (!user) return;
@@ -118,27 +123,22 @@ export default function PeopleScreen() {
             People Nearby
           </Text>
         </View>
-        {!locationPermission && (
-          <TouchableOpacity 
-            style={styles.locationButton} 
-            onPress={async () => {
-              const granted = await requestLocationPermission();
-              if (granted) {
-                refetch(); // Refresh people list with real distances
-              }
-            }}
-          >
-            <Text style={styles.locationButtonText}>📍 Show Real Distances</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       <FlatList
-        data={sortedPeople ?? []}
+        data={people ?? []}
         renderItem={renderUser}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            colors={['#FF8C42']} // Android spinner color
+            tintColor="#FF8C42"  // iOS spinner color
+          />
+        }
         ListEmptyComponent={() => (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>No people found</Text>
