@@ -59,7 +59,7 @@ export default function ChatScreen() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   
   const { user } = useAuth();
-  const { markAsRead } = useChats();
+  const { markAsRead, setActiveChat } = useChats();
   const { messages, loading: messagesLoading, error: messagesError, sendMessage } = useChatMessages(chatId);
   const { inviteParticipants } = useEventParticipants();
   const flatListRef = useRef<FlatList>(null);
@@ -613,6 +613,24 @@ export default function ChatScreen() {
       return () => clearTimeout(timeoutId);
     }
   }, [combinedData?.length || 0]);
+
+  // 1. Set this chat as "Active" so badges stay hidden while we are here
+  useEffect(() => {
+    if (chatId) {
+      setActiveChat(chatId);
+    }
+    // Cleanup: When leaving the screen, clear the active chat
+    return () => {
+      setActiveChat(null);
+    };
+  }, [chatId]);
+
+  // 2. Whenever a NEW message arrives (messages array changes), mark it as read immediately
+  useEffect(() => {
+    if (chatId && messages.length > 0) {
+      markAsRead(chatId);
+    }
+  }, [messages.length, chatId]);
 
   if (loading) {
     return (

@@ -16,6 +16,8 @@ interface ChatState {
   chats: ChatPreview[];
   loading: boolean;
   initialized: boolean;
+  activeChatId: string | null;
+  setActiveChat: (chatId: string | null) => void;
   setChats: (chats: ChatPreview[]) => void;
   fetchChats: (userId: string) => Promise<void>;
   markAsRead: (chatId: string, userId: string) => Promise<void>;
@@ -29,8 +31,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   chats: [],
   loading: false,
   initialized: false,
+  activeChatId: null,
 
   setChats: (chats) => set({ chats }),
+
+  setActiveChat: (chatId) => set({ activeChatId: chatId }),
 
   fetchChats: async (userId) => {
     if (!userId) return;
@@ -67,12 +72,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
             .neq('sender_id', userId)
             .gt('created_at', myLastRead || '1970-01-01');
 
+          const isActive = get().activeChatId === chat.id;
+          const finalUnreadCount = isActive ? 0 : (count || 0);
+
           return {
             id: chat.id,
             name: profile?.name || 'Unknown',
             lastMessage: lastMsg?.image_urls?.length ? "📷 Photo" : lastMsg?.message ?? "No messages",
             timestamp: new Date(lastMsg?.created_at || chat.created_at),
-            unreadCount: count || 0,
+            unreadCount: finalUnreadCount,
             avatar: profile?.avatar_url ?? null,
             otherUserId
           };

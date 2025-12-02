@@ -5,7 +5,7 @@ import { useAuth } from './useAuth';
 
 export function useChats() {
   const { user } = useAuth();
-  const { chats, loading, fetchChats, markAsRead, subscribeToChanges, unsubscribe } = useChatStore();
+  const { chats, loading, fetchChats, markAsRead, setActiveChat, subscribeToChanges, unsubscribe } = useChatStore();
 
   useEffect(() => {
     if (user?.id) {
@@ -14,7 +14,7 @@ export function useChats() {
     }
 
     return () => {
-      unsubscribe(); 
+      // unsubscribe(); 
     };
   }, [user?.id]);
 
@@ -23,6 +23,7 @@ export function useChats() {
     loading,
     refetch: () => user?.id && fetchChats(user.id),
     markAsRead: (chatId: string) => user?.id && markAsRead(chatId, user.id),
+    setActiveChat: (chatId: string | null) => setActiveChat(chatId),
   };
 }
 
