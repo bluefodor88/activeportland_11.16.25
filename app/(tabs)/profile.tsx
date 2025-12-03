@@ -375,7 +375,7 @@ export default function ProfileScreen() {
                   </View>
                 </TouchableOpacity>
                 <View style={styles.skillItemActions}>
-                  <TouchableOpacity
+                  {/* <TouchableOpacity
                     style={[styles.readyToggle, userSkill.ready_today && styles.readyToggleActive]}
                     onPress={async () => {
                       const success = await updateReadyToday(userSkill.activity_id, !userSkill.ready_today);
@@ -392,7 +392,7 @@ export default function ProfileScreen() {
                     <Text style={[styles.readyToggleText, userSkill.ready_today && styles.readyToggleTextActive]}>
                       Ready Today
                     </Text>
-                  </TouchableOpacity>
+                  </TouchableOpacity> */}
                   <TouchableOpacity
                     style={styles.removeButton}
                     onPress={() => handleRemoveActivity(userSkill.activity_id, userSkill.activities!.name)}
